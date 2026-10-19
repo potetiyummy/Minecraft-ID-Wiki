@@ -132,6 +132,9 @@ adminToggle.addEventListener("click", () => {
 onAuthStateChanged(auth, (user) => {
   loginForm.hidden = Boolean(user);
   addForm.hidden = !user;
+  if (user) {
+    adminSection.hidden = false;
+  }
 });
 
 loginForm.addEventListener("submit", async (event) => {
