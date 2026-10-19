@@ -8,3 +8,6 @@ export const firebaseConfig = {
   messagingSenderId: "201877040105",
   appId: "1:201877040105:web:c5349645c7cc42f65df978",
 };
+
+// 管理者の UID（firestore.rules と同じ値にしてください）
+export const adminUid = "PJgnV52rTFYzhsYm9UeDASY6mQi2";

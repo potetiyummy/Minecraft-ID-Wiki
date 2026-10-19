@@ -11,34 +11,21 @@
     <h1>統合版 ブロック・アイテムID</h1>
     <input id="search" type="search" placeholder="名前またはIDで検索">
     <button id="admin-toggle" type="button">管理者ログイン</button>
+    <button id="logout" type="button" hidden>ログアウト</button>
   </header>
 
   <div id="admin-screen" hidden>
     <header class="admin-header">
-      <h2>管理画面</h2>
-      <div>
-        <button id="logout" type="button" hidden>ログアウト</button>
-        <button id="admin-close" type="button">閉じる</button>
-      </div>
+      <h2>管理者ログイン</h2>
+      <button id="admin-close" type="button">閉じる</button>
     </header>
 
-    <section id="login-view" class="admin-body">
+    <section class="admin-body">
       <form id="login-form" class="admin-form">
         <input id="login-email" type="email" placeholder="メールアドレス" required>
         <input id="login-password" type="password" placeholder="パスワード" required>
         <button type="submit">ログイン</button>
         <p id="login-error" class="error"></p>
-      </form>
-    </section>
-
-    <section id="manage-view" class="admin-body" hidden>
-      <form id="add-form" class="admin-form">
-        <input id="new-id" placeholder="ID（例：minecraft:oak_planks）" required>
-        <input id="new-name-ja" placeholder="日本語名" required>
-        <input id="new-name-en" placeholder="英語名">
-        <input id="new-path" placeholder="カテゴリ（例：自然>木>板材）" required>
-        <button type="submit">追加</button>
-        <p id="add-status" class="error"></p>
       </form>
     </section>
   </div>
