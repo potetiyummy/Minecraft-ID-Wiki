@@ -121,14 +121,20 @@ function createInlineInput(placeholder, required) {
   return input;
 }
 
+function parseCategoryPath(text) {
+  return text.split(">").map((part) => part.trim()).filter(Boolean);
+}
+
+// path が null のときは、カテゴリをフォームで入力させる（ツリーの一番上の入口）
 function createAddForm(path, onCancel) {
   const form = document.createElement("form");
   form.className = "inline-form";
 
   const label = document.createElement("p");
   label.className = "inline-path";
-  label.textContent = path.join(" > ");
+  label.textContent = path ? path.join(" > ") : "カテゴリを指定して追加";
 
+  const categoryInput = path ? null : createInlineInput("カテゴリ（例：自然>木>板材）", true);
   const idInput = createInlineInput("ID（例：minecraft:oak_planks）", true);
   const jaInput = createInlineInput("日本語名", true);
   const enInput = createInlineInput("英語名", false);
@@ -145,11 +151,21 @@ function createAddForm(path, onCancel) {
   cancel.textContent = "キャンセル";
   cancel.addEventListener("click", onCancel);
 
-  form.append(label, idInput, jaInput, enInput, status, submit, cancel);
+  form.append(label);
+  if (categoryInput) {
+    form.append(categoryInput);
+  }
+  form.append(idInput, jaInput, enInput, status, submit, cancel);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     status.textContent = "";
+
+    const itemPath = path ?? parseCategoryPath(categoryInput.value);
+    if (itemPath.length === 0) {
+      status.textContent = "カテゴリを入力してください。";
+      return;
+    }
 
     const id = idInput.value.trim();
     if (!ID_PATTERN.test(id)) {
@@ -165,7 +181,7 @@ function createAddForm(path, onCancel) {
       id,
       name_ja: jaInput.value.trim(),
       name_en: enInput.value.trim(),
-      path,
+      path: itemPath,
     };
 
     submit.disabled = true;
@@ -211,6 +227,9 @@ function renderSearch(query) {
 
   const q = query.trim().toLowerCase();
   if (!q) {
+    if (isAdmin) {
+      treeNav.append(createNewItemEntry(null));
+    }
     renderTree(tree, treeNav);
     return;
   }
