@@ -108,6 +108,7 @@ function renderTree(node, container, parentPath = []) {
     if (isAdmin) {
       details.append(
         createEntry("+ ここに新規作成", (onCancel) => createAddForm(path, onCancel)),
+        createEntry("+ 一括新規作成", (onCancel) => createAddForm(path, onCancel, true)),
         createEntry("+ フォルダーを新規作成", (onCancel) => createFolderForm(path, onCancel)),
       );
     }
@@ -175,7 +176,7 @@ function buildItemId(template, value) {
 }
 
 // path が null のときは、カテゴリをフォームで入力させる（ツリーの一番上の入口）
-function createAddForm(path, onCancel) {
+function createAddForm(path, onCancel, bulk = false) {
   const form = document.createElement("form");
   form.className = "inline-form";
 
@@ -249,6 +250,15 @@ function createAddForm(path, onCancel) {
   });
 
   addRowButton.addEventListener("click", addRow);
+
+  // 1件だけの登録：テンプレートなしで、行が1つだけの状態から始める
+  if (!bulk) {
+    templateRow.hidden = true;
+    addRowButton.hidden = true;
+    confirmed = true;
+    listSection.hidden = false;
+    addRow();
+  }
 
   form.append(label);
   if (categoryInput) {
@@ -517,6 +527,7 @@ function renderSearch(query) {
       treeNav.append(
         createEntry("+ フォルダーを新規作成", (onCancel) => createFolderForm(null, onCancel)),
         createEntry("+ ここに新規作成", (onCancel) => createAddForm(null, onCancel)),
+        createEntry("+ 一括新規作成", (onCancel) => createAddForm(null, onCancel, true)),
       );
     }
     renderTree(tree, treeNav);
