@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import {
   browserLocalPersistence,
   getAuth,
+  getRedirectResult,
   GoogleAuthProvider,
   inMemoryPersistence,
   onAuthStateChanged,
@@ -668,15 +669,41 @@ async function loadAccount(uid) {
 }
 
 // ポップアップは別ウィンドウのためブロックされやすい。ページ遷移でログインする
+const REDIRECT_FLAG = "googleLoginPending";
+
 userLoginButton.addEventListener("click", async () => {
   try {
     await setPersistence(auth, browserLocalPersistence);
+    sessionStorage.setItem(REDIRECT_FLAG, "1");
     await signInWithRedirect(auth, new GoogleAuthProvider());
   } catch (error) {
+    sessionStorage.removeItem(REDIRECT_FLAG);
     window.alert("Googleでのログインに失敗しました。");
     console.error(error);
   }
 });
+
+// Google ログインから戻ってきた結果を確認する（失敗や、結果が受け取れなかったことを知らせる）
+async function checkRedirectResult() {
+  const pending = sessionStorage.getItem(REDIRECT_FLAG) === "1";
+  sessionStorage.removeItem(REDIRECT_FLAG);
+  try {
+    const result = await getRedirectResult(auth);
+    if (result) {
+      return;
+    }
+    if (pending) {
+      window.alert(
+        "Googleでのログイン結果を受け取れませんでした。ブラウザのプライバシー設定（サードパーティ Cookie やトラッキング防止）が原因のことがあります。",
+      );
+    }
+  } catch (error) {
+    window.alert(`Googleでのログインに失敗しました：${error.code ?? error.message}`);
+    console.error(error);
+  }
+}
+
+checkRedirectResult();
 
 accentPicker.addEventListener("change", async () => {
   const user = auth.currentUser;
