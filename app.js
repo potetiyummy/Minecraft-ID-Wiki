@@ -13,6 +13,7 @@ import {
   doc,
   getDocs,
   setDoc,
+  writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { adminUid, firebaseConfig } from "./firebase-config.js";
 
@@ -37,6 +38,7 @@ const loginEmail = document.getElementById("login-email");
 const loginPassword = document.getElementById("login-password");
 const loginError = document.getElementById("login-error");
 const treeNav = document.getElementById("tree");
+const folderMenu = document.getElementById("folder-menu");
 
 let items = [];
 let folderPaths = [];
@@ -86,6 +88,13 @@ function renderTree(node, container, parentPath = []) {
 
     const summary = document.createElement("summary");
     summary.textContent = name;
+    summary.addEventListener("contextmenu", (event) => {
+      if (!isAdmin) {
+        return;
+      }
+      event.preventDefault();
+      showFolderMenu(event.clientX, event.clientY, path);
+    });
     details.append(summary);
 
     for (const item of child.items) {
@@ -266,6 +275,90 @@ function createFolderForm(parentPath, onCancel) {
   return form;
 }
 
+// 指定したカテゴリパスが prefix で始まるか（自分自身も含む）
+function hasPrefix(path, prefix) {
+  return path.length >= prefix.length && prefix.every((name, i) => path[i] === name);
+}
+
+let menuPath = null;
+
+function showFolderMenu(x, y, path) {
+  menuPath = path;
+  folderMenu.style.left = `${x}px`;
+  folderMenu.style.top = `${y}px`;
+  folderMenu.hidden = false;
+}
+
+function hideFolderMenu() {
+  folderMenu.hidden = true;
+  menuPath = null;
+}
+
+async function renameFolder(path) {
+  const oldName = path[path.length - 1];
+  const input = window.prompt("新しいフォルダー名", oldName);
+  if (input === null) {
+    return;
+  }
+  const newName = input.trim();
+  if (!newName || newName.includes(">")) {
+    window.alert("フォルダー名を入力してください（「>」は使えません）。");
+    return;
+  }
+  if (newName === oldName) {
+    return;
+  }
+
+  const newPath = [...path.slice(0, -1), newName];
+  const conflict =
+    folderPaths.some((p) => hasPrefix(p, newPath)) || items.some((item) => hasPrefix(item.path, newPath));
+  if (conflict) {
+    window.alert("同じ名前のフォルダーが既にあります。");
+    return;
+  }
+
+  // 中のフォルダーとアイテムのカテゴリも、新しい名前に合わせて書き換える
+  const batch = writeBatch(db);
+  for (const folder of folderPaths.filter((p) => hasPrefix(p, path))) {
+    const renamed = [...newPath, ...folder.slice(path.length)];
+    batch.delete(doc(db, "folders", folder.join(">")));
+    batch.set(doc(db, "folders", renamed.join(">")), { path: renamed });
+  }
+  for (const item of items.filter((i) => hasPrefix(i.path, path))) {
+    batch.update(doc(db, "items", item.id), { path: [...newPath, ...item.path.slice(path.length)] });
+  }
+
+  try {
+    await batch.commit();
+    await loadItems();
+  } catch (error) {
+    window.alert("名前の変更に失敗しました。権限かネットワークを確認してください。");
+    console.error(error);
+  }
+}
+
+async function deleteFolder(path) {
+  const hasChildren =
+    items.some((item) => hasPrefix(item.path, path)) ||
+    folderPaths.some((p) => p.length > path.length && hasPrefix(p, path));
+  if (hasChildren) {
+    window.alert("中にアイテムやフォルダーがあるため削除できません。先に移動または削除してください。");
+    return;
+  }
+  const key = path.join(">");
+  if (!window.confirm(`フォルダー「${key}」を削除しますか？`)) {
+    return;
+  }
+
+  try {
+    await writeBatch(db).delete(doc(db, "folders", key)).commit();
+    await loadItems();
+  } catch (error) {
+    window.alert("削除に失敗しました。権限かネットワークを確認してください。");
+    console.error(error);
+  }
+}
+
 function showItem(item) {
   const detail = document.getElementById("detail");
   detail.replaceChildren();
@@ -359,6 +452,35 @@ loginForm.addEventListener("submit", async (event) => {
   } catch (error) {
     loginError.textContent = "ログインに失敗しました。";
     console.error(error);
+  }
+});
+
+// メニューの外側で押したら閉じる（右クリックで別のフォルダーを開いたときも閉じる）
+document.addEventListener("pointerdown", (event) => {
+  if (!folderMenu.contains(event.target)) {
+    hideFolderMenu();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    hideFolderMenu();
+  }
+});
+
+document.getElementById("menu-rename").addEventListener("click", () => {
+  const path = menuPath;
+  hideFolderMenu();
+  if (path) {
+    renameFolder(path);
+  }
+});
+
+document.getElementById("menu-delete").addEventListener("click", () => {
+  const path = menuPath;
+  hideFolderMenu();
+  if (path) {
+    deleteFolder(path);
   }
 });
 
