@@ -453,21 +453,27 @@ main {
 }
 
 .bulk-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bulk-inputs {
   display: grid;
-  grid-template-columns: 1fr auto 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
   gap: 6px;
   align-items: center;
 }
 
-.bulk-row input {
+.bulk-inputs input {
   min-width: 0;
 }
 
 .bulk-preview {
-  font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 12px;
   color: var(--muted);
-  white-space: nowrap;
+  padding-left: 2px;
+  overflow-wrap: anywhere;
 }
 
 /* フォルダーの右クリックメニュー */

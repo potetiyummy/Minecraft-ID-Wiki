@@ -161,7 +161,6 @@ function parseCategoryPath(text) {
   return text.split(">").map((part) => part.trim()).filter(Boolean);
 }
 
-// path が null のときは、カテゴリをフォームで入力させる（ツリーの一番上の入口）
 function createSmallButton(text, type) {
   const button = document.createElement("button");
   button.type = type;
@@ -175,6 +174,11 @@ function buildItemId(template, value) {
   return id.replace(/^minecraft:/, "");
 }
 
+// 日本語名のテンプレートが空なら入力値をそのまま名前にする。あれば {name} を入力値に置き換える
+function buildItemName(template, value) {
+  return template ? template.replace("{name}", value) : value;
+}
+
 // path が null のときは、カテゴリをフォームで入力させる（ツリーの一番上の入口）
 function createAddForm(path, onCancel, bulk = false) {
   const form = document.createElement("form");
@@ -186,12 +190,13 @@ function createAddForm(path, onCancel, bulk = false) {
 
   const categoryInput = path ? null : createInlineInput("カテゴリ（例：自然>木>板材）", true);
 
-  // 1. IDテンプレートを入力して確定（{id} の部分を後で一覧から入れる）
+  // 1. ID・日本語名のテンプレートを入力して確定（{id} と {name} の部分を後で一覧から入れる）
   const templateRow = document.createElement("div");
   templateRow.className = "inline-row";
   const templateInput = createInlineInput("IDテンプレート（例：{id}_planks）", false);
+  const nameTemplateInput = createInlineInput("日本語名テンプレート（例：{name}の板材）", false);
   const confirmButton = createSmallButton("確定", "button");
-  templateRow.append(templateInput, confirmButton);
+  templateRow.append(templateInput, nameTemplateInput, confirmButton);
 
   // 2. 確定後に表示される一覧（+ で行を増やす）
   const listSection = document.createElement("div");
@@ -207,7 +212,9 @@ function createAddForm(path, onCancel, bulk = false) {
   listSection.append(rowsContainer, addRowButton, submit);
 
   let template = "";
+  let nameTemplate = "";
   let confirmed = false;
+  // 1行が ID と日本語名の組。行数が同じなので、ID と名前の件数は必ず揃う
   const rows = [];
 
   function addRow() {
@@ -215,35 +222,49 @@ function createAddForm(path, onCancel, bulk = false) {
     row.className = "bulk-row";
 
     const idPart = createInlineInput(template ? "{id} の値（例：oak）" : "ID（例：oak_planks）", true);
+    const namePart = createInlineInput(nameTemplate ? "{name} の値（例：オーク）" : "日本語名", true);
+    const remove = createSmallButton("✕", "button");
     const preview = document.createElement("span");
     preview.className = "bulk-preview";
-    const nameInput = createInlineInput("日本語名", true);
-    const remove = createSmallButton("✕", "button");
 
-    const entry = { idPart, nameInput };
-    idPart.addEventListener("input", () => {
-      preview.textContent = buildItemId(template, idPart.value.trim());
-    });
+    const entry = { idPart, namePart };
+    const updatePreview = () => {
+      const id = buildItemId(template, idPart.value.trim());
+      const name = buildItemName(nameTemplate, namePart.value.trim());
+      preview.textContent = `${id || "…"} ／ ${name || "…"}`;
+    };
+    idPart.addEventListener("input", updatePreview);
+    namePart.addEventListener("input", updatePreview);
     remove.addEventListener("click", () => {
       rows.splice(rows.indexOf(entry), 1);
       row.remove();
     });
 
-    row.append(idPart, preview, nameInput, remove);
+    const inputs = document.createElement("div");
+    inputs.className = "bulk-inputs";
+    inputs.append(idPart, namePart, remove);
+    row.append(inputs, preview);
     rowsContainer.append(row);
     rows.push(entry);
   }
 
   confirmButton.addEventListener("click", () => {
     const value = templateInput.value.trim();
+    const nameValue = nameTemplateInput.value.trim();
     if (value && !value.includes("{id}")) {
-      status.textContent = "テンプレートには {id} を入れてください（例：{id}_planks）。";
+      status.textContent = "IDテンプレートには {id} を入れてください（例：{id}_planks）。";
+      return;
+    }
+    if (nameValue && !nameValue.includes("{name}")) {
+      status.textContent = "日本語名テンプレートには {name} を入れてください（例：{name}の板材）。";
       return;
     }
     status.textContent = "";
     template = value;
+    nameTemplate = nameValue;
     confirmed = true;
     templateInput.readOnly = true;
+    nameTemplateInput.readOnly = true;
     confirmButton.disabled = true;
     listSection.hidden = false;
     addRow();
@@ -283,11 +304,12 @@ function createAddForm(path, onCancel, bulk = false) {
     const seen = new Set();
     for (const row of rows) {
       const value = row.idPart.value.trim();
-      const name = row.nameInput.value.trim();
-      if (!value || !name) {
-        status.textContent = "すべての行に ID と日本語名を入力してください。";
+      const nameValue = row.namePart.value.trim();
+      if (!value || !nameValue) {
+        status.textContent = "すべての行に ID と日本語名の値を入力してください。";
         return;
       }
+      const name = buildItemName(nameTemplate, nameValue);
 
       const id = buildItemId(template, value);
       if (!ID_PATTERN.test(id)) {
