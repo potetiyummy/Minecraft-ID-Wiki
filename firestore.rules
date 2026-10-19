@@ -9,7 +9,7 @@ service cloud.firestore {
     match /items/{itemId} {
       allow read: if true;
       allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['id', 'name_ja', 'name_en', 'path'])
+        && request.resource.data.keys().hasOnly(['id', 'name_ja', 'name_en', 'path', 'image'])
         && request.resource.data.id == itemId
         && request.resource.data.path is list;
       allow delete: if isAdmin();

@@ -92,7 +92,17 @@ function renderTree(node, container, parentPath = []) {
 function createItemButton(item, label) {
   const button = document.createElement("button");
   button.className = "item";
-  button.textContent = label;
+  if (item.image) {
+    const icon = document.createElement("img");
+    icon.className = "item-icon";
+    icon.src = item.image;
+    icon.alt = "";
+    icon.loading = "lazy";
+    button.append(icon);
+  }
+  const text = document.createElement("span");
+  text.textContent = label;
+  button.append(text);
   button.addEventListener("click", () => showItem(item));
   return button;
 }
@@ -132,6 +142,8 @@ function createAddForm(path, onCancel) {
   const idInput = createInlineInput("ID（例：minecraft:oak_planks）", true);
   const jaInput = createInlineInput("日本語名", true);
   const enInput = createInlineInput("英語名", false);
+  const imageInput = createInlineInput("画像URL（任意、https://）", false);
+  imageInput.type = "url";
 
   const status = document.createElement("p");
   status.className = "error";
@@ -145,7 +157,7 @@ function createAddForm(path, onCancel) {
   cancel.textContent = "キャンセル";
   cancel.addEventListener("click", onCancel);
 
-  form.append(label, idInput, jaInput, enInput, status, submit, cancel);
+  form.append(label, idInput, jaInput, enInput, imageInput, status, submit, cancel);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -161,11 +173,18 @@ function createAddForm(path, onCancel) {
       return;
     }
 
+    const image = imageInput.value.trim();
+    if (image && !image.startsWith("https://")) {
+      status.textContent = "画像URLは https:// で始まる必要があります。";
+      return;
+    }
+
     const item = {
       id,
       name_ja: jaInput.value.trim(),
       name_en: enInput.value.trim(),
       path,
+      ...(image ? { image } : {}),
     };
 
     submit.disabled = true;
@@ -202,6 +221,14 @@ function showItem(item) {
   const copy = document.createElement("button");
   copy.textContent = "IDをコピー";
   copy.addEventListener("click", () => navigator.clipboard.writeText(item.id));
+
+  if (item.image) {
+    const picture = document.createElement("img");
+    picture.className = "detail-image";
+    picture.src = item.image;
+    picture.alt = item.name_ja;
+    detail.append(picture);
+  }
 
   detail.append(breadcrumb, name, english, id, copy);
 }

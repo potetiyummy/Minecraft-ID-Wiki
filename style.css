@@ -176,7 +176,9 @@ main {
 }
 
 .item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   margin: 2px 0;
   padding: 6px 10px;
@@ -191,6 +193,27 @@ main {
 
 .item:hover {
   background: var(--primary-soft);
+}
+
+.item-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.detail-image {
+  display: block;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 16px;
+  padding: 8px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: #fafcf9;
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 #detail {
