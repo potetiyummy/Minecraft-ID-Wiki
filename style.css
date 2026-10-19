@@ -1,3 +1,7 @@
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: "Yu Gothic UI", "Meiryo", sans-serif;
