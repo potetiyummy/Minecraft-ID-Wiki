@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
@@ -667,14 +667,13 @@ async function loadAccount(uid) {
   }
 }
 
+// ポップアップは別ウィンドウのためブロックされやすい。ページ遷移でログインする
 userLoginButton.addEventListener("click", async () => {
   try {
     await setPersistence(auth, browserLocalPersistence);
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    await signInWithRedirect(auth, new GoogleAuthProvider());
   } catch (error) {
-    if (error.code !== "auth/popup-closed-by-user") {
-      window.alert("Googleでのログインに失敗しました。");
-    }
+    window.alert("Googleでのログインに失敗しました。");
     console.error(error);
   }
 });
