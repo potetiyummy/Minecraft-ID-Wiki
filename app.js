@@ -21,9 +21,9 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // ログイン状態をメモリだけに保存する（再読み込みで必ずログアウトされる）
-await setPersistence(auth, inMemoryPersistence);
+setPersistence(auth, inMemoryPersistence).catch((error) => console.error(error));
 // 以前の保存済みログイン状態が残っていれば消す
-await signOut(auth);
+signOut(auth).catch((error) => console.error(error));
 
 const ID_PATTERN = /^[a-z0-9_.-]+:[a-z0-9_./-]+$/;
 
