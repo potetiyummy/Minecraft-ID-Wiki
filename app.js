@@ -39,6 +39,9 @@ const loginPassword = document.getElementById("login-password");
 const loginError = document.getElementById("login-error");
 const treeNav = document.getElementById("tree");
 const folderMenu = document.getElementById("folder-menu");
+const dangerPanel = document.getElementById("danger-confirm");
+const dangerButton = document.getElementById("danger-button");
+const dangerCancel = document.getElementById("danger-cancel");
 
 let items = [];
 let folderPaths = [];
@@ -337,26 +340,63 @@ async function renameFolder(path) {
   }
 }
 
-async function deleteFolder(path) {
-  const hasChildren =
-    items.some((item) => hasPrefix(item.path, path)) ||
-    folderPaths.some((p) => p.length > path.length && hasPrefix(p, path));
-  if (hasChildren) {
-    window.alert("中にアイテムやフォルダーがあるため削除できません。先に移動または削除してください。");
-    return;
-  }
-  const key = path.join(">");
-  if (!window.confirm(`フォルダー「${key}」を削除しますか？`)) {
+function deleteFolder(path) {
+  const childItems = items.filter((item) => hasPrefix(item.path, path));
+  const childFolders = folderPaths.filter((p) => p.length > path.length && hasPrefix(p, path));
+
+  if (childItems.length === 0 && childFolders.length === 0) {
+    const key = path.join(">");
+    if (window.confirm(`フォルダー「${key}」を削除しますか？`)) {
+      deleteFolderTree(path, childItems);
+    }
     return;
   }
 
+  openDangerConfirm(path, childItems, childFolders);
+}
+
+// フォルダーとその中のアイテム・サブフォルダーをまとめて削除する
+async function deleteFolderTree(path, childItems) {
+  const batch = writeBatch(db);
+  for (const item of childItems) {
+    batch.delete(doc(db, "items", item.id));
+  }
+  for (const folder of folderPaths.filter((p) => hasPrefix(p, path))) {
+    batch.delete(doc(db, "folders", folder.join(">")));
+  }
+
   try {
-    await writeBatch(db).delete(doc(db, "folders", key)).commit();
+    await batch.commit();
     await loadItems();
   } catch (error) {
     window.alert("削除に失敗しました。権限かネットワークを確認してください。");
     console.error(error);
   }
+}
+
+// 中身のあるフォルダーの削除確認（5回押すと削除）
+const DANGER_CLICKS = 5;
+let dangerCount = DANGER_CLICKS;
+let dangerAction = null;
+
+function openDangerConfirm(path, childItems, childFolders) {
+  document.getElementById("danger-message").textContent =
+    `「${path.join(" > ")}」の中には、アイテム ${childItems.length} 件、フォルダー ${childFolders.length} 件があります。` +
+    "削除すると中身もすべて消えます。";
+  dangerAction = () => deleteFolderTree(path, childItems);
+  resetDanger();
+  dangerPanel.hidden = false;
+}
+
+function resetDanger() {
+  dangerCount = DANGER_CLICKS;
+  dangerButton.textContent = `削除（あと${dangerCount}回）`;
+}
+
+function closeDanger() {
+  dangerPanel.hidden = true;
+  dangerAction = null;
+  resetDanger();
 }
 
 function showItem(item) {
@@ -455,6 +495,30 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
+// 削除確認：押すたびに減り、0になったら削除。カーソルが外れる・ほかを操作すると最初から
+dangerButton.addEventListener("click", () => {
+  dangerCount -= 1;
+  if (dangerCount > 0) {
+    dangerButton.textContent = `削除（あと${dangerCount}回）`;
+    return;
+  }
+  const action = dangerAction;
+  closeDanger();
+  if (action) {
+    action();
+  }
+});
+
+dangerButton.addEventListener("mouseleave", resetDanger);
+
+dangerCancel.addEventListener("click", closeDanger);
+
+document.addEventListener("pointerdown", (event) => {
+  if (!dangerPanel.hidden && !dangerButton.contains(event.target)) {
+    resetDanger();
+  }
+});
+
 // メニューの外側で押したら閉じる（右クリックで別のフォルダーを開いたときも閉じる）
 document.addEventListener("pointerdown", (event) => {
   if (!folderMenu.contains(event.target)) {
@@ -465,6 +529,11 @@ document.addEventListener("pointerdown", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     hideFolderMenu();
+    closeDanger();
+    return;
+  }
+  if (!dangerPanel.hidden) {
+    resetDanger();
   }
 });
 

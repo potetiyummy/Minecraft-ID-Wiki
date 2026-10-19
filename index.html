@@ -42,6 +42,15 @@
     <button id="menu-delete" type="button">削除</button>
   </div>
 
+  <div id="danger-confirm" class="danger-confirm" hidden>
+    <p id="danger-message"></p>
+    <p class="danger-note">削除するには、削除ボタンを5回押してください。ボタンからカーソルが外れたり、ほかの場所を操作したりすると、最初からになります。</p>
+    <div class="danger-actions">
+      <button id="danger-cancel" type="button">キャンセル</button>
+      <button id="danger-button" type="button">削除（あと5回）</button>
+    </div>
+  </div>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>

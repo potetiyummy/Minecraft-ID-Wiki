@@ -385,6 +385,56 @@ main {
   font-size: 12px;
 }
 
+/* 削除確認パネル */
+
+.danger-confirm {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 300;
+  width: min(440px, 90vw);
+  padding: 24px;
+  background: var(--surface);
+  border-top: 4px solid var(--danger);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.danger-confirm p {
+  margin: 0 0 12px;
+}
+
+.danger-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.danger-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.danger-actions button {
+  padding: 8px 14px;
+  font-size: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#danger-cancel {
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+#danger-button {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+}
+
 /* フォルダーの右クリックメニュー */
 
 .context-menu {
