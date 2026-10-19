@@ -161,6 +161,20 @@ function parseCategoryPath(text) {
 }
 
 // path が null のときは、カテゴリをフォームで入力させる（ツリーの一番上の入口）
+function createSmallButton(text, type) {
+  const button = document.createElement("button");
+  button.type = type;
+  button.textContent = text;
+  return button;
+}
+
+// テンプレートが空なら入力値をそのままIDにする。あれば {id} を入力値に置き換える
+function buildItemId(template, value) {
+  const id = template ? template.replace("{id}", value) : value;
+  return id.replace(/^minecraft:/, "");
+}
+
+// path が null のときは、カテゴリをフォームで入力させる（ツリーの一番上の入口）
 function createAddForm(path, onCancel) {
   const form = document.createElement("form");
   form.className = "inline-form";
@@ -170,25 +184,84 @@ function createAddForm(path, onCancel) {
   label.textContent = path ? path.join(" > ") : "カテゴリを指定して追加";
 
   const categoryInput = path ? null : createInlineInput("カテゴリ（例：自然>木>板材）", true);
-  const idInput = createInlineInput("ID（例：oak_planks）", true);
-  const jaInput = createInlineInput("日本語名", true);
+
+  // 1. IDテンプレートを入力して確定（{id} の部分を後で一覧から入れる）
+  const templateRow = document.createElement("div");
+  templateRow.className = "inline-row";
+  const templateInput = createInlineInput("IDテンプレート（例：{id}_planks）", false);
+  const confirmButton = createSmallButton("確定", "button");
+  templateRow.append(templateInput, confirmButton);
+
+  // 2. 確定後に表示される一覧（+ で行を増やす）
+  const listSection = document.createElement("div");
+  listSection.className = "bulk-list";
+  listSection.hidden = true;
+  const rowsContainer = document.createElement("div");
+  const addRowButton = createSmallButton("+ 行を追加", "button");
 
   const status = document.createElement("p");
   status.className = "error";
 
-  const submit = document.createElement("button");
-  submit.type = "submit";
-  submit.textContent = "追加";
+  const submit = createSmallButton("まとめて追加", "submit");
+  listSection.append(rowsContainer, addRowButton, submit);
+
+  let template = "";
+  let confirmed = false;
+  const rows = [];
+
+  function addRow() {
+    const row = document.createElement("div");
+    row.className = "bulk-row";
+
+    const idPart = createInlineInput(template ? "{id} の値（例：oak）" : "ID（例：oak_planks）", true);
+    const preview = document.createElement("span");
+    preview.className = "bulk-preview";
+    const nameInput = createInlineInput("日本語名", true);
+    const remove = createSmallButton("✕", "button");
+
+    const entry = { idPart, nameInput };
+    idPart.addEventListener("input", () => {
+      preview.textContent = buildItemId(template, idPart.value.trim());
+    });
+    remove.addEventListener("click", () => {
+      rows.splice(rows.indexOf(entry), 1);
+      row.remove();
+    });
+
+    row.append(idPart, preview, nameInput, remove);
+    rowsContainer.append(row);
+    rows.push(entry);
+  }
+
+  confirmButton.addEventListener("click", () => {
+    const value = templateInput.value.trim();
+    if (value && !value.includes("{id}")) {
+      status.textContent = "テンプレートには {id} を入れてください（例：{id}_planks）。";
+      return;
+    }
+    status.textContent = "";
+    template = value;
+    confirmed = true;
+    templateInput.readOnly = true;
+    confirmButton.disabled = true;
+    listSection.hidden = false;
+    addRow();
+  });
+
+  addRowButton.addEventListener("click", addRow);
 
   form.append(label);
   if (categoryInput) {
     form.append(categoryInput);
   }
-  form.append(idInput, jaInput, status, submit, createCancelButton(onCancel));
+  form.append(templateRow, listSection, status, createCancelButton(onCancel));
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     status.textContent = "";
+    if (!confirmed) {
+      return;
+    }
 
     const itemPath = path ?? parseCategoryPath(categoryInput.value);
     if (itemPath.length === 0) {
@@ -196,26 +269,37 @@ function createAddForm(path, onCancel) {
       return;
     }
 
-    // 統合版のIDは minecraft: を付けない（入力されていれば外す）
-    const id = idInput.value.trim().replace(/^minecraft:/, "");
-    if (!ID_PATTERN.test(id)) {
-      status.textContent = "IDは英小文字・数字・_ で入力してください（例：oak_planks）";
-      return;
-    }
-    if (items.some((item) => item.id === id)) {
-      status.textContent = "同じIDが既に登録されています。";
-      return;
-    }
+    const newItems = [];
+    const seen = new Set();
+    for (const row of rows) {
+      const value = row.idPart.value.trim();
+      const name = row.nameInput.value.trim();
+      if (!value || !name) {
+        status.textContent = "すべての行に ID と日本語名を入力してください。";
+        return;
+      }
 
-    const item = {
-      id,
-      name_ja: jaInput.value.trim(),
-      path: itemPath,
-    };
+      const id = buildItemId(template, value);
+      if (!ID_PATTERN.test(id)) {
+        status.textContent = `IDの形式が正しくありません：${id}（英小文字・数字・_ のみ）`;
+        return;
+      }
+      if (seen.has(id) || items.some((item) => item.id === id)) {
+        status.textContent = `同じIDが重複しています：${id}`;
+        return;
+      }
+
+      seen.add(id);
+      newItems.push({ id, name_ja: name, path: itemPath });
+    }
 
     submit.disabled = true;
     try {
-      await setDoc(doc(db, "items", id), item);
+      const batch = writeBatch(db);
+      for (const item of newItems) {
+        batch.set(doc(db, "items", item.id), item);
+      }
+      await batch.commit();
       await loadItems();
     } catch (error) {
       status.textContent = "追加に失敗しました。権限かネットワークを確認してください。";

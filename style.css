@@ -435,6 +435,41 @@ main {
   border: none;
 }
 
+/* 一括登録 */
+
+.inline-row {
+  display: flex;
+  gap: 6px;
+}
+
+.inline-row input {
+  flex: 1;
+}
+
+.bulk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bulk-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.bulk-row input {
+  min-width: 0;
+}
+
+.bulk-preview {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 /* フォルダーの右クリックメニュー */
 
 .context-menu {
