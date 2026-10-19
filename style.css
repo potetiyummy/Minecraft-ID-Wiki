@@ -452,28 +452,40 @@ main {
   gap: 6px;
 }
 
-.bulk-row {
+.template-section,
+.bulk-individual {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-}
-
-.bulk-inputs {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
   gap: 6px;
-  align-items: center;
 }
 
-.bulk-inputs input {
+.bulk-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.bulk-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
 }
 
-.bulk-preview {
-  font-size: 12px;
-  color: var(--muted);
-  padding-left: 2px;
-  overflow-wrap: anywhere;
+.bulk-cell {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.bulk-cell input {
+  flex: 1;
+  min-width: 0;
+}
+
+.bulk-remove {
+  padding: 4px 8px !important;
+  color: var(--danger);
 }
 
 /* フォルダーの右クリックメニュー */

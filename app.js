@@ -168,18 +168,25 @@ function createSmallButton(text, type) {
   return button;
 }
 
-// テンプレートが空なら入力値をそのままIDにする。あれば {id} を入力値に置き換える
-function buildItemId(template, value) {
-  const id = template ? template.replace("{id}", value) : value;
-  return id.replace(/^minecraft:/, "");
+// テンプレート内の {...} はすべて入力値に置き換える（例：{aa}_{aa} → abc_abc）。テンプレートが空なら入力値のまま
+function applyTemplate(template, value) {
+  return template ? template.replace(/\{[^{}]+\}/g, value) : value;
 }
 
-// 日本語名のテンプレートが空なら入力値をそのまま名前にする。あれば {name} を入力値に置き換える
+function buildItemId(template, value) {
+  return applyTemplate(template, value).replace(/^minecraft:/, "");
+}
+
 function buildItemName(template, value) {
-  return template ? template.replace("{name}", value) : value;
+  return applyTemplate(template, value);
+}
+
+function hasPlaceholder(template) {
+  return /\{[^{}]+\}/.test(template);
 }
 
 // path が null のときは、カテゴリをフォームで入力させる（ツリーの一番上の入口）
+// bulk が false のときは1件だけ登録する。true のときはテンプレートを使って複数件を登録する
 function createAddForm(path, onCancel, bulk = false) {
   const form = document.createElement("form");
   form.className = "inline-form";
@@ -188,113 +195,122 @@ function createAddForm(path, onCancel, bulk = false) {
   label.className = "inline-path";
   label.textContent = path ? path.join(" > ") : "カテゴリを指定して追加";
 
-  const categoryInput = path ? null : createInlineInput("カテゴリ（例：自然>木>板材）", true);
-
-  // 1. ID・日本語名のテンプレートを入力して確定（{id} と {name} の部分を後で一覧から入れる）
-  const templateRow = document.createElement("div");
-  templateRow.className = "inline-row";
-  const templateInput = createInlineInput("IDテンプレート（例：{id}_planks）", false);
-  const nameTemplateInput = createInlineInput("日本語名テンプレート（例：{name}の板材）", false);
-  const confirmButton = createSmallButton("確定", "button");
-  templateRow.append(templateInput, nameTemplateInput, confirmButton);
-
-  // 2. 確定後に表示される一覧（+ で行を増やす）
-  const listSection = document.createElement("div");
-  listSection.className = "bulk-list";
-  listSection.hidden = true;
-  const rowsContainer = document.createElement("div");
-  const addRowButton = createSmallButton("+ 行を追加", "button");
-
+  const categoryInput = path ? null : createInlineInput("カテゴリ（例：自然>木>板材）", false);
   const status = document.createElement("p");
   status.className = "error";
 
-  const submit = createSmallButton("まとめて追加", "submit");
-  listSection.append(rowsContainer, addRowButton, submit);
+  const submitButtons = [];
 
-  let template = "";
+  // 1. テンプレートを使用する場合（確定すると、個別入力がリストに変わる）
+  const templateSection = document.createElement("div");
+  templateSection.className = "template-section";
+  const templateTitle = document.createElement("p");
+  templateTitle.className = "inline-path";
+  templateTitle.textContent = "テンプレートを使用する場合";
+  const idTemplateInput = createInlineInput("IDテンプレート（例：{aa}_{aa}）", false);
+  const nameTemplateInput = createInlineInput("日本語名テンプレート（例：{ja}の木材）", false);
+  const confirmButton = createSmallButton("確定", "submit");
+  submitButtons.push(confirmButton);
+  templateSection.append(templateTitle, idTemplateInput, nameTemplateInput, confirmButton);
+
+  // 2. 個別入力（リストに変わる前の入力）
+  const individual = document.createElement("div");
+  individual.className = "bulk-individual";
+  const idInput = createInlineInput("ID（例：oak_planks）", false);
+  const nameInput = createInlineInput("日本語名", false);
+  individual.append(idInput, nameInput);
+  if (!bulk) {
+    const singleSubmit = createSmallButton("追加", "submit");
+    submitButtons.push(singleSubmit);
+    individual.append(singleSubmit);
+  }
+
+  // 3. リスト（ID列と日本語名列を分けて表示。行数は必ず揃う）
+  const listSection = document.createElement("div");
+  listSection.className = "bulk-list";
+  listSection.hidden = true;
+  const columns = document.createElement("div");
+  columns.className = "bulk-columns";
+  const idColumn = document.createElement("div");
+  idColumn.className = "bulk-column";
+  const nameColumn = document.createElement("div");
+  nameColumn.className = "bulk-column";
+  const idHeader = document.createElement("p");
+  idHeader.className = "inline-path";
+  idHeader.textContent = "ID";
+  const nameHeader = document.createElement("p");
+  nameHeader.className = "inline-path";
+  nameHeader.textContent = "日本語名";
+  idColumn.append(idHeader);
+  nameColumn.append(nameHeader);
+  columns.append(idColumn, nameColumn);
+  const addRowButton = createSmallButton("+ 行を追加", "button");
+  const listSubmit = createSmallButton("まとめて追加", "submit");
+  submitButtons.push(listSubmit);
+  listSection.append(columns, addRowButton, listSubmit);
+
+  let listMode = false;
+  let idTemplate = "";
   let nameTemplate = "";
-  let confirmed = false;
-  // 1行が ID と日本語名の組。行数が同じなので、ID と名前の件数は必ず揃う
+  // ID列と日本語名列の行。1行ずつ組で増減するので、件数は必ず一致する
   const rows = [];
 
-  function addRow() {
-    const row = document.createElement("div");
-    row.className = "bulk-row";
+  function addRow(idValue = "", nameValue = "") {
+    const idField = createInlineInput("ID（例：oak）", false);
+    idField.value = idValue;
+    const nameField = createInlineInput("日本語名（例：オーク）", false);
+    nameField.value = nameValue;
 
-    const idPart = createInlineInput(template ? "{id} の値（例：oak）" : "ID（例：oak_planks）", true);
-    const namePart = createInlineInput(nameTemplate ? "{name} の値（例：オーク）" : "日本語名", true);
+    const idCell = document.createElement("div");
+    idCell.className = "bulk-cell";
+    const nameCell = document.createElement("div");
+    nameCell.className = "bulk-cell";
     const remove = createSmallButton("✕", "button");
-    const preview = document.createElement("span");
-    preview.className = "bulk-preview";
+    remove.className = "bulk-remove";
+    idCell.append(idField, remove);
+    nameCell.append(nameField);
 
-    const entry = { idPart, namePart };
-    const updatePreview = () => {
-      const id = buildItemId(template, idPart.value.trim());
-      const name = buildItemName(nameTemplate, namePart.value.trim());
-      preview.textContent = `${id || "…"} ／ ${name || "…"}`;
-    };
-    idPart.addEventListener("input", updatePreview);
-    namePart.addEventListener("input", updatePreview);
+    const entry = { idField, nameField };
     remove.addEventListener("click", () => {
       rows.splice(rows.indexOf(entry), 1);
-      row.remove();
+      idCell.remove();
+      nameCell.remove();
     });
 
-    const inputs = document.createElement("div");
-    inputs.className = "bulk-inputs";
-    inputs.append(idPart, namePart, remove);
-    row.append(inputs, preview);
-    rowsContainer.append(row);
+    idColumn.append(idCell);
+    nameColumn.append(nameCell);
     rows.push(entry);
   }
 
-  confirmButton.addEventListener("click", () => {
-    const value = templateInput.value.trim();
-    const nameValue = nameTemplateInput.value.trim();
-    if (value && !value.includes("{id}")) {
-      status.textContent = "IDテンプレートには {id} を入れてください（例：{id}_planks）。";
+  function confirmTemplates() {
+    const idTemplateValue = idTemplateInput.value.trim();
+    const nameTemplateValue = nameTemplateInput.value.trim();
+    if (idTemplateValue && !hasPlaceholder(idTemplateValue)) {
+      status.textContent = "IDテンプレートには {…} の部分を入れてください（例：{aa}_{aa}）。";
       return;
     }
-    if (nameValue && !nameValue.includes("{name}")) {
-      status.textContent = "日本語名テンプレートには {name} を入れてください（例：{name}の板材）。";
+    if (nameTemplateValue && !hasPlaceholder(nameTemplateValue)) {
+      status.textContent = "日本語名テンプレートには {…} の部分を入れてください（例：{ja}の木材）。";
       return;
     }
+
     status.textContent = "";
-    template = value;
-    nameTemplate = nameValue;
-    confirmed = true;
-    templateInput.readOnly = true;
+    idTemplate = idTemplateValue;
+    nameTemplate = nameTemplateValue;
+    listMode = true;
+    idTemplateInput.readOnly = true;
     nameTemplateInput.readOnly = true;
     confirmButton.disabled = true;
+    individual.hidden = true;
     listSection.hidden = false;
-    addRow();
-  });
-
-  addRowButton.addEventListener("click", addRow);
-
-  // 1件だけの登録：テンプレートなしで、行が1つだけの状態から始める
-  if (!bulk) {
-    templateRow.hidden = true;
-    addRowButton.hidden = true;
-    confirmed = true;
-    listSection.hidden = false;
-    addRow();
+    // 個別に入力していた値は、1行目に引き継ぐ
+    addRow(idInput.value.trim(), nameInput.value.trim());
   }
 
-  form.append(label);
-  if (categoryInput) {
-    form.append(categoryInput);
-  }
-  form.append(templateRow, listSection, status, createCancelButton(onCancel));
+  addRowButton.addEventListener("click", () => addRow());
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    status.textContent = "";
-    if (!confirmed) {
-      return;
-    }
-
-    const itemPath = path ?? parseCategoryPath(categoryInput.value);
+  async function saveItems(entries, idTpl, nameTpl) {
+    const itemPath = path ?? parseCategoryPath(categoryInput ? categoryInput.value : "");
     if (itemPath.length === 0) {
       status.textContent = "カテゴリを入力してください。";
       return;
@@ -302,16 +318,12 @@ function createAddForm(path, onCancel, bulk = false) {
 
     const newItems = [];
     const seen = new Set();
-    for (const row of rows) {
-      const value = row.idPart.value.trim();
-      const nameValue = row.namePart.value.trim();
-      if (!value || !nameValue) {
-        status.textContent = "すべての行に ID と日本語名の値を入力してください。";
+    for (const { idValue, nameValue } of entries) {
+      if (!idValue || !nameValue) {
+        status.textContent = "すべての行に ID と日本語名を入力してください。";
         return;
       }
-      const name = buildItemName(nameTemplate, nameValue);
-
-      const id = buildItemId(template, value);
+      const id = buildItemId(idTpl, idValue);
       if (!ID_PATTERN.test(id)) {
         status.textContent = `IDの形式が正しくありません：${id}（英小文字・数字・_ のみ）`;
         return;
@@ -320,12 +332,13 @@ function createAddForm(path, onCancel, bulk = false) {
         status.textContent = `同じIDが重複しています：${id}`;
         return;
       }
-
       seen.add(id);
-      newItems.push({ id, name_ja: name, path: itemPath });
+      newItems.push({ id, name_ja: buildItemName(nameTpl, nameValue), path: itemPath });
     }
 
-    submit.disabled = true;
+    for (const button of submitButtons) {
+      button.disabled = true;
+    }
     try {
       const batch = writeBatch(db);
       for (const item of newItems) {
@@ -336,9 +349,40 @@ function createAddForm(path, onCancel, bulk = false) {
     } catch (error) {
       status.textContent = "追加に失敗しました。権限かネットワークを確認してください。";
       console.error(error);
-      submit.disabled = false;
+      for (const button of submitButtons) {
+        button.disabled = false;
+      }
     }
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    status.textContent = "";
+
+    if (!listMode) {
+      if (bulk) {
+        confirmTemplates();
+        return;
+      }
+      await saveItems([{ idValue: idInput.value.trim(), nameValue: nameInput.value.trim() }], "", "");
+      return;
+    }
+
+    const entries = rows.map(({ idField, nameField }) => ({
+      idValue: idField.value.trim(),
+      nameValue: nameField.value.trim(),
+    }));
+    await saveItems(entries, idTemplate, nameTemplate);
   });
+
+  form.append(label);
+  if (categoryInput) {
+    form.append(categoryInput);
+  }
+  if (bulk) {
+    form.append(templateSection);
+  }
+  form.append(individual, listSection, status, createCancelButton(onCancel));
 
   return form;
 }
