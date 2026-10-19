@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>統合版 ブロック・アイテムID</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>統合版 ブロック・アイテムID</h1>
+    <input id="search" type="search" placeholder="名前またはIDで検索">
+    <button id="admin-toggle" type="button">管理者</button>
+  </header>
+
+  <section id="admin-section" hidden>
+    <form id="login-form">
+      <input id="login-email" type="email" placeholder="メールアドレス" required>
+      <input id="login-password" type="password" placeholder="パスワード" required>
+      <button type="submit">ログイン</button>
+      <p id="login-error" class="error"></p>
+    </form>
+
+    <form id="add-form" hidden>
+      <input id="new-id" placeholder="ID（例：minecraft:oak_planks）" required>
+      <input id="new-name-ja" placeholder="日本語名" required>
+      <input id="new-name-en" placeholder="英語名">
+      <input id="new-path" placeholder="カテゴリ（例：自然>木>板材）" required>
+      <button type="submit">追加</button>
+      <button id="logout" type="button">ログアウト</button>
+      <p id="add-status"></p>
+    </form>
+  </section>
+
+  <main>
+    <nav id="tree"></nav>
+    <section id="detail">
+      <p class="hint">左のカテゴリから選ぶか、検索してください。</p>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

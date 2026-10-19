@@ -1,0 +1,110 @@
+body {
+  margin: 0;
+  font-family: "Yu Gothic UI", "Meiryo", sans-serif;
+  color: #222;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #2e7d32;
+  color: #fff;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+#search {
+  flex: 1;
+  max-width: 360px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+main {
+  display: flex;
+  min-height: calc(100vh - 56px);
+}
+
+#tree {
+  width: 320px;
+  padding: 12px;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+}
+
+#tree details {
+  margin-left: 8px;
+}
+
+#tree summary {
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  margin: 2px 0;
+  padding: 4px 8px;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.item:hover {
+  background: #e8f5e9;
+}
+
+#detail {
+  flex: 1;
+  padding: 24px;
+}
+
+.breadcrumb {
+  color: #666;
+  font-size: 14px;
+}
+
+#detail code {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #f4f4f4;
+  font-size: 15px;
+}
+
+.hint {
+  color: #888;
+}
+
+#admin-section {
+  padding: 12px 20px;
+  background: #f1f8f2;
+  border-bottom: 1px solid #ddd;
+}
+
+#admin-section form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+#admin-section input {
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+.error,
+#add-status {
+  width: 100%;
+  margin: 0;
+  color: #c62828;
+  font-size: 13px;
+}

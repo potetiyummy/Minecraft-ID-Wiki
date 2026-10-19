@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      // Firebase Authentication で作成した管理者の UID に置き換えてください
+      return request.auth != null && request.auth.uid == "PJgnV52rTFYzhsYm9UeDASY6mQi2";
+    }
+
+    match /items/{itemId} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['id', 'name_ja', 'name_en', 'path'])
+        && request.resource.data.id == itemId
+        && request.resource.data.path is list;
+      allow delete: if isAdmin();
+    }
+  }
+}
+
