@@ -160,7 +160,6 @@ function createAddForm(path, onCancel) {
   const categoryInput = path ? null : createInlineInput("カテゴリ（例：自然>木>板材）", true);
   const idInput = createInlineInput("ID（例：minecraft:oak_planks）", true);
   const jaInput = createInlineInput("日本語名", true);
-  const enInput = createInlineInput("英語名", false);
 
   const status = document.createElement("p");
   status.className = "error";
@@ -173,7 +172,7 @@ function createAddForm(path, onCancel) {
   if (categoryInput) {
     form.append(categoryInput);
   }
-  form.append(idInput, jaInput, enInput, status, submit, createCancelButton(onCancel));
+  form.append(idInput, jaInput, status, submit, createCancelButton(onCancel));
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -198,7 +197,6 @@ function createAddForm(path, onCancel) {
     const item = {
       id,
       name_ja: jaInput.value.trim(),
-      name_en: enInput.value.trim(),
       path: itemPath,
     };
 
