@@ -4,6 +4,6 @@
   },
   "hosting": {
     "public": ".",
-    "ignore": ["firebase.json", "firestore.rules", "**/.*"]
+    "ignore": ["firebase.json", "firestore.rules", "**/.*", ".git/**", "**/.git/**", ".firebase/**", "README.md"]
   }
 }
