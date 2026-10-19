@@ -83,22 +83,55 @@ main {
   color: #888;
 }
 
-#admin-section {
-  padding: 12px 20px;
-  background: #f1f8f2;
-  border-bottom: 1px solid #ddd;
+#admin-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow-y: auto;
+  background: #fff;
 }
 
-#admin-section form {
+.admin-header {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  padding: 12px 20px;
+  background: #1b5e20;
+  color: #fff;
 }
 
-#admin-section input {
-  padding: 6px 10px;
-  font-size: 14px;
+.admin-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.admin-header button {
+  margin-left: 8px;
+}
+
+.admin-body {
+  display: flex;
+  justify-content: center;
+  padding: 48px 20px;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.admin-form input {
+  padding: 8px 10px;
+  font-size: 15px;
+}
+
+.admin-form button {
+  padding: 8px 10px;
+  font-size: 15px;
+  cursor: pointer;
 }
 
 .error,

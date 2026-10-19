@@ -10,27 +10,38 @@
   <header>
     <h1>統合版 ブロック・アイテムID</h1>
     <input id="search" type="search" placeholder="名前またはIDで検索">
-    <button id="admin-toggle" type="button">管理者</button>
+    <button id="admin-toggle" type="button">管理者ログイン</button>
   </header>
 
-  <section id="admin-section" hidden>
-    <form id="login-form">
-      <input id="login-email" type="email" placeholder="メールアドレス" required>
-      <input id="login-password" type="password" placeholder="パスワード" required>
-      <button type="submit">ログイン</button>
-      <p id="login-error" class="error"></p>
-    </form>
+  <div id="admin-screen" hidden>
+    <header class="admin-header">
+      <h2>管理画面</h2>
+      <div>
+        <button id="logout" type="button" hidden>ログアウト</button>
+        <button id="admin-close" type="button">閉じる</button>
+      </div>
+    </header>
 
-    <form id="add-form" hidden>
-      <input id="new-id" placeholder="ID（例：minecraft:oak_planks）" required>
-      <input id="new-name-ja" placeholder="日本語名" required>
-      <input id="new-name-en" placeholder="英語名">
-      <input id="new-path" placeholder="カテゴリ（例：自然>木>板材）" required>
-      <button type="submit">追加</button>
-      <button id="logout" type="button">ログアウト</button>
-      <p id="add-status"></p>
-    </form>
-  </section>
+    <section id="login-view" class="admin-body">
+      <form id="login-form" class="admin-form">
+        <input id="login-email" type="email" placeholder="メールアドレス" required>
+        <input id="login-password" type="password" placeholder="パスワード" required>
+        <button type="submit">ログイン</button>
+        <p id="login-error" class="error"></p>
+      </form>
+    </section>
+
+    <section id="manage-view" class="admin-body" hidden>
+      <form id="add-form" class="admin-form">
+        <input id="new-id" placeholder="ID（例：minecraft:oak_planks）" required>
+        <input id="new-name-ja" placeholder="日本語名" required>
+        <input id="new-name-en" placeholder="英語名">
+        <input id="new-path" placeholder="カテゴリ（例：自然>木>板材）" required>
+        <button type="submit">追加</button>
+        <p id="add-status" class="error"></p>
+      </form>
+    </section>
+  </div>
 
   <main>
     <nav id="tree"></nav>

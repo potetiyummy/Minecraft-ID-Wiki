@@ -22,7 +22,10 @@ const ID_PATTERN = /^[a-z0-9_.-]+:[a-z0-9_./-]+$/;
 
 const searchInput = document.getElementById("search");
 const adminToggle = document.getElementById("admin-toggle");
-const adminSection = document.getElementById("admin-section");
+const adminScreen = document.getElementById("admin-screen");
+const adminClose = document.getElementById("admin-close");
+const loginView = document.getElementById("login-view");
+const manageView = document.getElementById("manage-view");
 const loginForm = document.getElementById("login-form");
 const loginEmail = document.getElementById("login-email");
 const loginPassword = document.getElementById("login-password");
@@ -126,14 +129,19 @@ async function loadItems() {
 }
 
 adminToggle.addEventListener("click", () => {
-  adminSection.hidden = !adminSection.hidden;
+  adminScreen.hidden = false;
+});
+
+adminClose.addEventListener("click", () => {
+  adminScreen.hidden = true;
 });
 
 onAuthStateChanged(auth, (user) => {
-  loginForm.hidden = Boolean(user);
-  addForm.hidden = !user;
+  loginView.hidden = Boolean(user);
+  manageView.hidden = !user;
+  logoutButton.hidden = !user;
   if (user) {
-    adminSection.hidden = false;
+    adminScreen.hidden = false;
   }
 });
 
