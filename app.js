@@ -39,12 +39,23 @@ const loginError = document.getElementById("login-error");
 const treeNav = document.getElementById("tree");
 
 let items = [];
+let folderPaths = [];
 let tree = { children: {}, items: [] };
 let isAdmin = false;
 const openPaths = new Set();
 
-function buildTree(items) {
+function buildTree(items, folderPaths) {
   const root = { children: {}, items: [] };
+  // 空のフォルダーも含めてノードを作る
+  for (const path of folderPaths) {
+    let node = root;
+    for (const category of path) {
+      if (!node.children[category]) {
+        node.children[category] = { children: {}, items: [] };
+      }
+      node = node.children[category];
+    }
+  }
   for (const item of items) {
     let node = root;
     for (const category of item.path) {
@@ -83,7 +94,10 @@ function renderTree(node, container, parentPath = []) {
     renderTree(child, details, path);
 
     if (isAdmin) {
-      details.append(createNewItemEntry(path));
+      details.append(
+        createEntry("+ ここに新規作成", (onCancel) => createAddForm(path, onCancel)),
+        createEntry("+ フォルダーを新規作成", (onCancel) => createFolderForm(path, onCancel)),
+      );
     }
     container.append(details);
   }
@@ -97,19 +111,20 @@ function createItemButton(item, label) {
   return button;
 }
 
-function createNewItemEntry(path) {
+// 入口ボタンを作る。押すと openForm で作ったフォームに差し替わり、キャンセルで元に戻る
+function createEntry(label, openForm) {
   const wrapper = document.createElement("div");
-  showAddEntry(wrapper, path);
+  showEntry(wrapper, label, openForm);
   return wrapper;
 }
 
-function showAddEntry(wrapper, path) {
+function showEntry(wrapper, label, openForm) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "add-entry";
-  button.textContent = "+ ここに新規作成";
+  button.textContent = label;
   button.addEventListener("click", () => {
-    wrapper.replaceChildren(createAddForm(path, () => showAddEntry(wrapper, path)));
+    wrapper.replaceChildren(openForm(() => showEntry(wrapper, label, openForm)));
   });
   wrapper.replaceChildren(button);
 }
@@ -119,6 +134,14 @@ function createInlineInput(placeholder, required) {
   input.placeholder = placeholder;
   input.required = required;
   return input;
+}
+
+function createCancelButton(onCancel) {
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.textContent = "キャンセル";
+  cancel.addEventListener("click", onCancel);
+  return cancel;
 }
 
 function parseCategoryPath(text) {
@@ -146,16 +169,11 @@ function createAddForm(path, onCancel) {
   submit.type = "submit";
   submit.textContent = "追加";
 
-  const cancel = document.createElement("button");
-  cancel.type = "button";
-  cancel.textContent = "キャンセル";
-  cancel.addEventListener("click", onCancel);
-
   form.append(label);
   if (categoryInput) {
     form.append(categoryInput);
   }
-  form.append(idInput, jaInput, enInput, status, submit, cancel);
+  form.append(idInput, jaInput, enInput, status, submit, createCancelButton(onCancel));
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -198,6 +216,58 @@ function createAddForm(path, onCancel) {
   return form;
 }
 
+// parentPath が null のときは、フォルダーの場所もフォームで入力させる（ツリーの一番上の入口）
+function createFolderForm(parentPath, onCancel) {
+  const form = document.createElement("form");
+  form.className = "inline-form";
+
+  const label = document.createElement("p");
+  label.className = "inline-path";
+  label.textContent = parentPath ? `${parentPath.join(" > ")} の中に作成` : "フォルダーを作成";
+
+  const nameInput = parentPath
+    ? createInlineInput("フォルダー名（例：木）", true)
+    : createInlineInput("フォルダー（例：自然>木）", true);
+
+  const status = document.createElement("p");
+  status.className = "error";
+
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.textContent = "作成";
+
+  form.append(label, nameInput, status, submit, createCancelButton(onCancel));
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    status.textContent = "";
+
+    const folderPath = [...(parentPath ?? []), ...parseCategoryPath(nameInput.value)];
+    if (folderPath.length === 0) {
+      status.textContent = "フォルダー名を入力してください。";
+      return;
+    }
+
+    const key = folderPath.join(">");
+    if (folderPaths.some((path) => path.join(">") === key)) {
+      status.textContent = "同じフォルダーが既にあります。";
+      return;
+    }
+
+    submit.disabled = true;
+    try {
+      await setDoc(doc(db, "folders", key), { path: folderPath });
+      await loadItems();
+    } catch (error) {
+      status.textContent = "作成に失敗しました。権限かネットワークを確認してください。";
+      console.error(error);
+      submit.disabled = false;
+    }
+  });
+
+  return form;
+}
+
 function showItem(item) {
   const detail = document.getElementById("detail");
   detail.replaceChildren();
@@ -228,7 +298,10 @@ function renderSearch(query) {
   const q = query.trim().toLowerCase();
   if (!q) {
     if (isAdmin) {
-      treeNav.append(createNewItemEntry(null));
+      treeNav.append(
+        createEntry("+ フォルダーを新規作成", (onCancel) => createFolderForm(null, onCancel)),
+        createEntry("+ ここに新規作成", (onCancel) => createAddForm(null, onCancel)),
+      );
     }
     renderTree(tree, treeNav);
     return;
@@ -243,10 +316,14 @@ function renderSearch(query) {
 }
 
 async function loadItems() {
-  const snapshot = await getDocs(collection(db, "items"));
-  items = snapshot.docs.map((d) => d.data());
+  const [itemSnapshot, folderSnapshot] = await Promise.all([
+    getDocs(collection(db, "items")),
+    getDocs(collection(db, "folders")),
+  ]);
+  items = itemSnapshot.docs.map((d) => d.data());
   items.sort((a, b) => a.id.localeCompare(b.id));
-  tree = buildTree(items);
+  folderPaths = folderSnapshot.docs.map((d) => d.data().path);
+  tree = buildTree(items, folderPaths);
   renderSearch(searchInput.value);
 }
 
