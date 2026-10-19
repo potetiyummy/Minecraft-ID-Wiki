@@ -26,7 +26,7 @@ setPersistence(auth, inMemoryPersistence).catch((error) => console.error(error))
 // 以前の保存済みログイン状態が残っていれば消す
 signOut(auth).catch((error) => console.error(error));
 
-const ID_PATTERN = /^[a-z0-9_.-]+:[a-z0-9_./-]+$/;
+const ID_PATTERN = /^[a-z0-9_]+$/;
 
 const searchInput = document.getElementById("search");
 const adminToggle = document.getElementById("admin-toggle");
@@ -170,7 +170,7 @@ function createAddForm(path, onCancel) {
   label.textContent = path ? path.join(" > ") : "カテゴリを指定して追加";
 
   const categoryInput = path ? null : createInlineInput("カテゴリ（例：自然>木>板材）", true);
-  const idInput = createInlineInput("ID（例：minecraft:oak_planks）", true);
+  const idInput = createInlineInput("ID（例：oak_planks）", true);
   const jaInput = createInlineInput("日本語名", true);
 
   const status = document.createElement("p");
@@ -196,9 +196,10 @@ function createAddForm(path, onCancel) {
       return;
     }
 
-    const id = idInput.value.trim();
+    // 統合版のIDは minecraft: を付けない（入力されていれば外す）
+    const id = idInput.value.trim().replace(/^minecraft:/, "");
     if (!ID_PATTERN.test(id)) {
-      status.textContent = "IDの形式が正しくありません（例：minecraft:oak_planks）";
+      status.textContent = "IDは英小文字・数字・_ で入力してください（例：oak_planks）";
       return;
     }
     if (items.some((item) => item.id === id)) {
