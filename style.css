@@ -82,6 +82,35 @@ button {
   transition: background 0.15s, transform 0.05s;
 }
 
+#user-login,
+#accent-picker {
+  margin-left: auto;
+}
+
+#accent-picker {
+  width: 42px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+}
+
+#user-login {
+  padding: 8px 14px;
+  font-size: 14px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius);
+  white-space: nowrap;
+}
+
+#user-login:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
 #admin-toggle {
   margin-left: auto;
   background: rgba(255, 255, 255, 0.15);
@@ -460,8 +489,8 @@ main {
 }
 
 .bulk-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 

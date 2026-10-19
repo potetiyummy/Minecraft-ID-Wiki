@@ -1,13 +1,17 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
+  browserLocalPersistence,
   getAuth,
+  GoogleAuthProvider,
   inMemoryPersistence,
   onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
+  getDoc,
   getFirestore,
   collection,
   doc,
@@ -21,16 +25,16 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ログイン状態をメモリだけに保存する（再読み込みで必ずログアウトされる）
-setPersistence(auth, inMemoryPersistence).catch((error) => console.error(error));
-// 以前の保存済みログイン状態が残っていれば消す
-signOut(auth).catch((error) => console.error(error));
+// 管理者のログインを許可している間だけ true（再読み込みで管理者のログインは切れる）
+let adminSessionAllowed = false;
 
 const ID_PATTERN = /^[a-z0-9_]+$/;
 
 const searchInput = document.getElementById("search");
 const adminToggle = document.getElementById("admin-toggle");
 const logoutButton = document.getElementById("logout");
+const userLoginButton = document.getElementById("user-login");
+const accentPicker = document.getElementById("accent-picker");
 const adminScreen = document.getElementById("admin-screen");
 const adminClose = document.getElementById("admin-close");
 const loginForm = document.getElementById("login-form");
@@ -628,14 +632,89 @@ adminClose.addEventListener("click", () => {
   adminScreen.hidden = true;
 });
 
-logoutButton.addEventListener("click", () => signOut(auth));
+logoutButton.addEventListener("click", () => {
+  adminSessionAllowed = false;
+  signOut(auth);
+});
 
-onAuthStateChanged(auth, (user) => {
+const DEFAULT_ACCENT = "#2e7d32";
+
+// 色を黒または白に近づけて、濃い色・薄い色を作る
+function mixColor(hex, target, ratio) {
+  const n = parseInt(hex.slice(1), 16);
+  const from = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const to = target === "white" ? [255, 255, 255] : [0, 0, 0];
+  const mixed = from.map((v, i) => Math.round(v + (to[i] - v) * ratio));
+  return `#${mixed.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function applyAccent(color) {
+  const style = document.documentElement.style;
+  style.setProperty("--primary", color);
+  style.setProperty("--primary-dark", mixColor(color, "black", 0.25));
+  style.setProperty("--primary-soft", mixColor(color, "white", 0.88));
+  accentPicker.value = color;
+}
+
+async function loadAccount(uid) {
+  try {
+    const snapshot = await getDoc(doc(db, "users", uid));
+    const accent = snapshot.exists() ? snapshot.data().accent : null;
+    applyAccent(accent || DEFAULT_ACCENT);
+  } catch (error) {
+    console.error(error);
+    applyAccent(DEFAULT_ACCENT);
+  }
+}
+
+userLoginButton.addEventListener("click", async () => {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (error) {
+    if (error.code !== "auth/popup-closed-by-user") {
+      window.alert("Googleでのログインに失敗しました。");
+    }
+    console.error(error);
+  }
+});
+
+accentPicker.addEventListener("change", async () => {
+  const user = auth.currentUser;
+  if (!user) {
+    return;
+  }
+  const color = accentPicker.value;
+  applyAccent(color);
+  try {
+    await setDoc(doc(db, "users", user.uid), { accent: color });
+  } catch (error) {
+    window.alert("色の保存に失敗しました。");
+    console.error(error);
+  }
+});
+
+onAuthStateChanged(auth, async (user) => {
+  // 残っている管理者のログインは消す（管理者は再読み込みで切れるようにする）
+  if (user && user.uid === adminUid && !adminSessionAllowed) {
+    signOut(auth);
+    return;
+  }
+
   isAdmin = Boolean(user) && user.uid === adminUid;
-  adminToggle.hidden = isAdmin;
-  logoutButton.hidden = !isAdmin;
+  const signedIn = Boolean(user);
+  userLoginButton.hidden = signedIn;
+  adminToggle.hidden = signedIn;
+  logoutButton.hidden = !signedIn;
+  accentPicker.hidden = !signedIn;
   if (isAdmin) {
     adminScreen.hidden = true;
+  }
+
+  if (signedIn) {
+    await loadAccount(user.uid);
+  } else {
+    applyAccent(DEFAULT_ACCENT);
   }
   renderSearch(searchInput.value);
 });
@@ -643,15 +722,19 @@ onAuthStateChanged(auth, (user) => {
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   loginError.textContent = "";
+  adminSessionAllowed = true;
   try {
+    await setPersistence(auth, inMemoryPersistence);
     const credential = await signInWithEmailAndPassword(auth, loginEmail.value, loginPassword.value);
     if (credential.user.uid !== adminUid) {
+      adminSessionAllowed = false;
       await signOut(auth);
       loginError.textContent = "このアカウントは管理者ではありません。";
       return;
     }
     loginForm.reset();
   } catch (error) {
+    adminSessionAllowed = false;
     loginError.textContent = "ログインに失敗しました。";
     console.error(error);
   }
