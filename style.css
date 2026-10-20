@@ -506,6 +506,18 @@ main {
   gap: 12px;
 }
 
+/* プレースホルダーが1つずつのときは、ID と日本語名を横に並べる */
+.bulk-list--row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.bulk-list--row > button {
+  grid-column: 1 / -1;
+}
+
 .bulk-group {
   display: flex;
   gap: 12px;
