@@ -345,6 +345,8 @@ function createAddForm(path, onCancel, bulk = false) {
     nameTemplate = nameTemplateValue;
     idColumns = setupColumns(idGroup, placeholderNames(idTemplate), "ID");
     nameColumns = setupColumns(nameGroup, placeholderNames(nameTemplate), "日本語名");
+    // プレースホルダーが1つずつなら、ID と日本語名を横に並べる
+    listSection.classList.toggle("bulk-list--row", idColumns.length <= 1 && nameColumns.length <= 1);
     listMode = true;
     idTemplateInput.readOnly = true;
     nameTemplateInput.readOnly = true;
