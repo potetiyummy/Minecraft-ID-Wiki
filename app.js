@@ -6,7 +6,6 @@ import {
   inMemoryPersistence,
   onAuthStateChanged,
   setPersistence,
-  signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -31,7 +30,6 @@ let adminSessionAllowed = false;
 const ID_PATTERN = /^[a-z0-9_]+$/;
 
 const searchInput = document.getElementById("search");
-const adminToggle = document.getElementById("admin-toggle");
 const logoutButton = document.getElementById("logout");
 const userLoginButton = document.getElementById("user-login");
 const accentPicker = document.getElementById("accent-picker");
@@ -41,12 +39,6 @@ const rememberCheckbox = document.getElementById("remember-device");
 // このデバイスで管理者のログインを保存するかどうか
 const REMEMBER_KEY = "rememberAdminDevice";
 const isRememberedDevice = () => localStorage.getItem(REMEMBER_KEY) === "1";
-const adminScreen = document.getElementById("admin-screen");
-const adminClose = document.getElementById("admin-close");
-const loginForm = document.getElementById("login-form");
-const loginEmail = document.getElementById("login-email");
-const loginPassword = document.getElementById("login-password");
-const loginError = document.getElementById("login-error");
 const treeNav = document.getElementById("tree");
 const folderMenu = document.getElementById("folder-menu");
 const dangerPanel = document.getElementById("danger-confirm");
@@ -630,14 +622,6 @@ async function loadItems() {
   renderSearch(searchInput.value);
 }
 
-adminToggle.addEventListener("click", () => {
-  adminScreen.hidden = false;
-});
-
-adminClose.addEventListener("click", () => {
-  adminScreen.hidden = true;
-});
-
 logoutButton.addEventListener("click", () => {
   adminSessionAllowed = false;
   localStorage.removeItem(REMEMBER_KEY);
@@ -735,12 +719,10 @@ function updateAuthUi(user) {
   isAdmin = Boolean(user) && user.uid === adminUid;
   const signedIn = Boolean(user);
   userLoginButton.hidden = signedIn;
-  adminToggle.hidden = signedIn;
   logoutButton.hidden = !signedIn;
   accentPicker.hidden = !signedIn;
   rememberLabel.hidden = !isAdmin;
   if (isAdmin) {
-    adminScreen.hidden = true;
     rememberCheckbox.checked = isRememberedDevice();
   }
 }
@@ -766,27 +748,6 @@ onAuthStateChanged(auth, (user) => {
     applyAccent(DEFAULT_ACCENT);
   }
   renderSearch(searchInput.value);
-});
-
-loginForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  loginError.textContent = "";
-  adminSessionAllowed = true;
-  try {
-    await setPersistence(auth, isRememberedDevice() ? browserLocalPersistence : inMemoryPersistence);
-    const credential = await signInWithEmailAndPassword(auth, loginEmail.value, loginPassword.value);
-    if (credential.user.uid !== adminUid) {
-      adminSessionAllowed = false;
-      await signOut(auth);
-      loginError.textContent = "このアカウントは管理者ではありません。";
-      return;
-    }
-    loginForm.reset();
-  } catch (error) {
-    adminSessionAllowed = false;
-    loginError.textContent = "ログインに失敗しました。";
-    console.error(error);
-  }
 });
 
 // 削除確認：押すたびに減り、0になったら削除。カーソルが外れる・ほかを操作すると最初から
