@@ -263,9 +263,14 @@ function createAddForm(path, onCancel, bulk = false) {
   const addRowButton = createSmallButton("+ 行を追加", "button");
   const listSubmit = createSmallButton("まとめて追加", "submit");
   submitButtons.push(listSubmit);
-  listSection.append(idGroup, nameGroup, addRowButton, listSubmit);
+  // 1件ずつのとき（プレースホルダーが1つずつ）は、1行ごとに ID と日本語名を並べる
+  const rowLines = document.createElement("div");
+  rowLines.className = "bulk-lines";
+  rowLines.hidden = true;
+  listSection.append(idGroup, nameGroup, rowLines, addRowButton, listSubmit);
 
   let listMode = false;
+  let rowMode = false;
   let idTemplate = "";
   let nameTemplate = "";
   let idColumns = [];
@@ -291,22 +296,39 @@ function createAddForm(path, onCancel, bulk = false) {
   function addRow(idValues = {}, nameValues = {}) {
     const entry = { idFields: new Map(), nameFields: new Map(), cells: [] };
 
-    const makeCell = (column, value, fields, placeholder) => {
-      const cell = document.createElement("div");
-      cell.className = "bulk-cell";
-      const input = createInlineInput(column.key ? `${column.key} の値` : placeholder, false);
-      input.value = value;
-      cell.append(input);
-      column.column.append(cell);
-      fields.set(column.key, input);
-      entry.cells.push(cell);
-    };
+    if (rowMode) {
+      // 1行に ID と日本語名を並べる（上下がずれない）
+      const line = document.createElement("div");
+      line.className = "bulk-line";
+      const idKey = idColumns[0].key;
+      const nameKey = nameColumns[0].key;
+      const idInput = createInlineInput(idKey ? `${idKey} の値` : "ID（例：oak_planks）", false);
+      idInput.value = idValues[idKey] ?? "";
+      const nameInput = createInlineInput(nameKey ? `${nameKey} の値` : "日本語名", false);
+      nameInput.value = nameValues[nameKey] ?? "";
+      line.append(idInput, nameInput);
+      entry.idFields.set(idKey, idInput);
+      entry.nameFields.set(nameKey, nameInput);
+      entry.cells.push(line);
+      rowLines.append(line);
+    } else {
+      const makeCell = (column, value, fields, placeholder) => {
+        const cell = document.createElement("div");
+        cell.className = "bulk-cell";
+        const input = createInlineInput(column.key ? `${column.key} の値` : placeholder, false);
+        input.value = value;
+        cell.append(input);
+        column.column.append(cell);
+        fields.set(column.key, input);
+        entry.cells.push(cell);
+      };
 
-    for (const column of idColumns) {
-      makeCell(column, idValues[column.key] ?? "", entry.idFields, "ID（例：oak_planks）");
-    }
-    for (const column of nameColumns) {
-      makeCell(column, nameValues[column.key] ?? "", entry.nameFields, "日本語名");
+      for (const column of idColumns) {
+        makeCell(column, idValues[column.key] ?? "", entry.idFields, "ID（例：oak_planks）");
+      }
+      for (const column of nameColumns) {
+        makeCell(column, nameValues[column.key] ?? "", entry.nameFields, "日本語名");
+      }
     }
 
     // 削除ボタンは行の先頭のセルに付ける
@@ -345,8 +367,20 @@ function createAddForm(path, onCancel, bulk = false) {
     nameTemplate = nameTemplateValue;
     idColumns = setupColumns(idGroup, placeholderNames(idTemplate), "ID");
     nameColumns = setupColumns(nameGroup, placeholderNames(nameTemplate), "日本語名");
-    // プレースホルダーが1つずつなら、ID と日本語名を横に並べる
-    listSection.classList.toggle("bulk-list--row", idColumns.length <= 1 && nameColumns.length <= 1);
+    rowMode = idColumns.length <= 1 && nameColumns.length <= 1;
+    idGroup.hidden = rowMode;
+    nameGroup.hidden = rowMode;
+    rowLines.hidden = !rowMode;
+    if (rowMode) {
+      const header = document.createElement("div");
+      header.className = "bulk-line bulk-line--head";
+      const idTitle = document.createElement("p");
+      idTitle.textContent = idColumns[0].key ? `ID（${idColumns[0].key}）` : "ID";
+      const nameTitle = document.createElement("p");
+      nameTitle.textContent = nameColumns[0].key ? `日本語名（${nameColumns[0].key}）` : "日本語名";
+      header.append(idTitle, nameTitle);
+      rowLines.replaceChildren(header);
+    }
     listMode = true;
     idTemplateInput.readOnly = true;
     nameTemplateInput.readOnly = true;
@@ -378,8 +412,13 @@ function createAddForm(path, onCancel, bulk = false) {
         status.textContent = `IDの形式が正しくありません：${id}（英小文字・数字・_ のみ）`;
         return;
       }
-      if (seen.has(id) || items.some((item) => item.id === id)) {
-        status.textContent = `同じIDが重複しています：${id}`;
+      if (seen.has(id)) {
+        status.textContent = `この一覧の中で同じIDがあります：${id}`;
+        return;
+      }
+      const existing = items.find((item) => item.id === id);
+      if (existing) {
+        status.textContent = `同じIDのアイテムが既に登録されています：${id}（${existing.name_ja}）`;
         return;
       }
       seen.add(id);
