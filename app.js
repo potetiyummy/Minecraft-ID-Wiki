@@ -183,22 +183,29 @@ function createSmallButton(text, type) {
   return button;
 }
 
-// テンプレート内の {...} はすべて入力値に置き換える（例：{aa}_{aa} → abc_abc）。テンプレートが空なら入力値のまま
-function applyTemplate(template, value) {
-  return template ? template.replace(/\{[^{}]+\}/g, value) : value;
+// テンプレート内の {名前} を値で置き換える（例：{aa}_{bb} と {aa: abc, bb: planks} → abc_planks）
+// テンプレートが空なら、値は「""」のキーの1つだけを使う
+function fillTemplate(template, values) {
+  if (!template) {
+    return values[""] ?? "";
+  }
+  return template.replace(/\{([^{}]+)\}/g, (_, key) => values[key] ?? "");
 }
 
-function buildItemId(template, value) {
-  return applyTemplate(template, value).replace(/^minecraft:/, "");
+function buildItemId(template, values) {
+  return fillTemplate(template, values).replace(/^minecraft:/, "");
 }
 
-function buildItemName(template, value) {
-  return applyTemplate(template, value);
+function buildItemName(template, values) {
+  return fillTemplate(template, values);
 }
 
-// テンプレートの最初のプレースホルダー名（例：{aa}_planks → aa）
-function placeholderName(template) {
-  return template.match(/\{([^{}]+)\}/)?.[1] ?? "";
+// テンプレートのプレースホルダー名を、出てくる順・重複なしで返す（例：{aa}_{bb}_{aa} → ["aa", "bb"]）
+function placeholderNames(template) {
+  if (!template) {
+    return [""];
+  }
+  return [...new Set([...template.matchAll(/\{([^{}]+)\}/g)].map((match) => match[1]))];
 }
 
 function hasPlaceholder(template) {
@@ -227,8 +234,8 @@ function createAddForm(path, onCancel, bulk = false) {
   const templateTitle = document.createElement("p");
   templateTitle.className = "inline-path";
   templateTitle.textContent = "テンプレートを使用する場合";
-  const idTemplateInput = createInlineInput("IDテンプレート（例：{aa}_{aa}）", false);
-  const nameTemplateInput = createInlineInput("日本語名テンプレート（例：{ja}の木材）", false);
+  const idTemplateInput = createInlineInput("IDテンプレート（例：{aa}_{bb}）", false);
+  const nameTemplateInput = createInlineInput("日本語名テンプレート（例：{aa}の{bb}）", false);
   const confirmButton = createSmallButton("確定", "submit");
   submitButtons.push(confirmButton);
   templateSection.append(templateTitle, idTemplateInput, nameTemplateInput, confirmButton);
@@ -245,89 +252,107 @@ function createAddForm(path, onCancel, bulk = false) {
     individual.append(singleSubmit);
   }
 
-  // 3. リスト（ID列と日本語名列を分けて表示。行数は必ず揃う）
+  // 3. リスト。ID側はプレースホルダーごとに列を並べ、その下に日本語名側の列を並べる
   const listSection = document.createElement("div");
   listSection.className = "bulk-list";
   listSection.hidden = true;
-  const columns = document.createElement("div");
-  columns.className = "bulk-columns";
-  const idColumn = document.createElement("div");
-  idColumn.className = "bulk-column";
-  const nameColumn = document.createElement("div");
-  nameColumn.className = "bulk-column";
-  const idHeader = document.createElement("p");
-  idHeader.className = "inline-path";
-  idHeader.textContent = "ID";
-  const nameHeader = document.createElement("p");
-  nameHeader.className = "inline-path";
-  nameHeader.textContent = "日本語名";
-  idColumn.append(idHeader);
-  nameColumn.append(nameHeader);
-  columns.append(idColumn, nameColumn);
+  const idGroup = document.createElement("div");
+  idGroup.className = "bulk-group";
+  const nameGroup = document.createElement("div");
+  nameGroup.className = "bulk-group";
   const addRowButton = createSmallButton("+ 行を追加", "button");
   const listSubmit = createSmallButton("まとめて追加", "submit");
   submitButtons.push(listSubmit);
-  listSection.append(columns, addRowButton, listSubmit);
+  listSection.append(idGroup, nameGroup, addRowButton, listSubmit);
 
   let listMode = false;
   let idTemplate = "";
   let nameTemplate = "";
-  // ID列と日本語名列の行。1行ずつ組で増減するので、件数は必ず一致する
+  let idColumns = [];
+  let nameColumns = [];
+  // 行。各行は列ごとの入力欄を持つ（行数はすべての列で同じ）
   const rows = [];
 
-  function addRow(idValue = "", nameValue = "") {
-    const idField = createInlineInput("ID（例：oak）", false);
-    idField.value = idValue;
-    const nameField = createInlineInput("日本語名（例：オーク）", false);
-    nameField.value = nameValue;
+  // 列を作り直す（プレースホルダーごとに1列。キーが空なら見出しだけ）
+  function setupColumns(group, keys, label) {
+    group.replaceChildren();
+    return keys.map((key) => {
+      const column = document.createElement("div");
+      column.className = "bulk-column";
+      const title = document.createElement("p");
+      title.className = "inline-path";
+      title.textContent = key ? `${label}（${key}）` : label;
+      column.append(title);
+      group.append(column);
+      return { key, column };
+    });
+  }
 
-    const idCell = document.createElement("div");
-    idCell.className = "bulk-cell";
-    const nameCell = document.createElement("div");
-    nameCell.className = "bulk-cell";
+  function addRow(idValues = {}, nameValues = {}) {
+    const entry = { idFields: new Map(), nameFields: new Map(), cells: [] };
+
+    const makeCell = (column, value, fields, placeholder) => {
+      const cell = document.createElement("div");
+      cell.className = "bulk-cell";
+      const input = createInlineInput(column.key ? `${column.key} の値` : placeholder, false);
+      input.value = value;
+      cell.append(input);
+      column.column.append(cell);
+      fields.set(column.key, input);
+      entry.cells.push(cell);
+    };
+
+    for (const column of idColumns) {
+      makeCell(column, idValues[column.key] ?? "", entry.idFields, "ID（例：oak_planks）");
+    }
+    for (const column of nameColumns) {
+      makeCell(column, nameValues[column.key] ?? "", entry.nameFields, "日本語名");
+    }
+
+    // 削除ボタンは行の先頭のセルに付ける
     const remove = createSmallButton("✕", "button");
     remove.className = "bulk-remove";
-    idCell.append(idField, remove);
-    nameCell.append(nameField);
-
-    const entry = { idField, nameField };
+    entry.cells[0].append(remove);
     remove.addEventListener("click", () => {
       rows.splice(rows.indexOf(entry), 1);
-      idCell.remove();
-      nameCell.remove();
+      entry.cells.forEach((cell) => cell.remove());
     });
 
-    idColumn.append(idCell);
-    nameColumn.append(nameCell);
     rows.push(entry);
+  }
+
+  function readRow(entry) {
+    return {
+      idValues: Object.fromEntries([...entry.idFields].map(([key, input]) => [key, input.value.trim()])),
+      nameValues: Object.fromEntries([...entry.nameFields].map(([key, input]) => [key, input.value.trim()])),
+    };
   }
 
   function confirmTemplates() {
     const idTemplateValue = idTemplateInput.value.trim();
     const nameTemplateValue = nameTemplateInput.value.trim();
     if (idTemplateValue && !hasPlaceholder(idTemplateValue)) {
-      status.textContent = "IDテンプレートには {…} の部分を入れてください（例：{aa}_{aa}）。";
+      status.textContent = "IDテンプレートには {…} の部分を入れてください（例：{aa}_{bb}）。";
       return;
     }
     if (nameTemplateValue && !hasPlaceholder(nameTemplateValue)) {
-      status.textContent = "日本語名テンプレートには {…} の部分を入れてください（例：{ja}の木材）。";
+      status.textContent = "日本語名テンプレートには {…} の部分を入れてください（例：{aa}の{bb}）。";
       return;
     }
 
     status.textContent = "";
     idTemplate = idTemplateValue;
     nameTemplate = nameTemplateValue;
-    // リストの見出しを、テンプレートのプレースホルダー名に合わせる
-    idHeader.textContent = idTemplate ? `英語名（${placeholderName(idTemplate)}）` : "ID";
-    nameHeader.textContent = nameTemplate ? `日本語名（${placeholderName(nameTemplate)}）` : "日本語名";
+    idColumns = setupColumns(idGroup, placeholderNames(idTemplate), "ID");
+    nameColumns = setupColumns(nameGroup, placeholderNames(nameTemplate), "日本語名");
     listMode = true;
     idTemplateInput.readOnly = true;
     nameTemplateInput.readOnly = true;
     confirmButton.disabled = true;
     individual.hidden = true;
     listSection.hidden = false;
-    // 個別に入力していた値は、1行目に引き継ぐ
-    addRow(idInput.value.trim(), nameInput.value.trim());
+    // 個別に入力していた値は、1行目に引き継ぐ（テンプレートなしのときに使われる）
+    addRow({ "": idInput.value.trim() }, { "": nameInput.value.trim() });
   }
 
   addRowButton.addEventListener("click", () => addRow());
@@ -341,12 +366,12 @@ function createAddForm(path, onCancel, bulk = false) {
 
     const newItems = [];
     const seen = new Set();
-    for (const { idValue, nameValue } of entries) {
-      if (!idValue || !nameValue) {
+    for (const { idValues, nameValues } of entries) {
+      if (Object.values(idValues).some((v) => !v) || Object.values(nameValues).some((v) => !v)) {
         status.textContent = "すべての行に ID と日本語名を入力してください。";
         return;
       }
-      const id = buildItemId(idTpl, idValue);
+      const id = buildItemId(idTpl, idValues);
       if (!ID_PATTERN.test(id)) {
         status.textContent = `IDの形式が正しくありません：${id}（英小文字・数字・_ のみ）`;
         return;
@@ -356,7 +381,7 @@ function createAddForm(path, onCancel, bulk = false) {
         return;
       }
       seen.add(id);
-      newItems.push({ id, name_ja: buildItemName(nameTpl, nameValue), path: itemPath });
+      newItems.push({ id, name_ja: buildItemName(nameTpl, nameValues), path: itemPath });
     }
 
     for (const button of submitButtons) {
@@ -387,15 +412,15 @@ function createAddForm(path, onCancel, bulk = false) {
         confirmTemplates();
         return;
       }
-      await saveItems([{ idValue: idInput.value.trim(), nameValue: nameInput.value.trim() }], "", "");
+      await saveItems(
+        [{ idValues: { "": idInput.value.trim() }, nameValues: { "": nameInput.value.trim() } }],
+        "",
+        "",
+      );
       return;
     }
 
-    const entries = rows.map(({ idField, nameField }) => ({
-      idValue: idField.value.trim(),
-      nameValue: nameField.value.trim(),
-    }));
-    await saveItems(entries, idTemplate, nameTemplate);
+    await saveItems(rows.map(readRow), idTemplate, nameTemplate);
   });
 
   form.append(label);

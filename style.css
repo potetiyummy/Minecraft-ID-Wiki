@@ -506,6 +506,12 @@ main {
   gap: 12px;
 }
 
+.bulk-group {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
 .bulk-column {
   display: flex;
   flex-direction: column;
