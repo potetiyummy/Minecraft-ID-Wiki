@@ -362,9 +362,9 @@ main {
   padding: 6px 10px;
   text-align: left;
   font-size: 13px;
-  color: var(--primary);
+  color: var(--text);
   background: none;
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--primary);
   border-radius: 6px;
   cursor: pointer;
 }
