@@ -509,10 +509,12 @@ main {
 .bulk-group {
   display: flex;
   gap: 12px;
+  width: 100%;
   align-items: flex-start;
 }
 
 .bulk-column {
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
