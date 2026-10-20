@@ -10,6 +10,8 @@
   --danger: #c62828;
   --radius: 10px;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --shadow-strong: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --on-primary: #ffffff;
 }
 
 [hidden] {
@@ -36,7 +38,7 @@ header {
   gap: 16px;
   padding: 14px 24px;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #fff;
+  color: var(--on-primary);
   box-shadow: var(--shadow);
   position: sticky;
   top: 0;
@@ -100,7 +102,7 @@ button {
 #user-login {
   padding: 8px 14px;
   font-size: 14px;
-  color: #fff;
+  color: var(--on-primary);
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: var(--radius);
@@ -124,7 +126,7 @@ button {
 #admin-toggle {
   margin-left: auto;
   background: rgba(255, 255, 255, 0.15);
-  color: #fff;
+  color: var(--on-primary);
   border-color: rgba(255, 255, 255, 0.4);
   white-space: nowrap;
 }
@@ -136,7 +138,7 @@ button {
 .admin-form button[type="submit"],
 #detail button {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .admin-form button[type="submit"]:hover,
@@ -147,7 +149,7 @@ button {
 #logout,
 #admin-close {
   background: rgba(255, 255, 255, 0.15);
-  color: #fff;
+  color: var(--on-primary);
   border-color: rgba(255, 255, 255, 0.4);
 }
 
@@ -289,7 +291,7 @@ main {
   align-items: center;
   padding: 14px 24px;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #fff;
+  color: var(--on-primary);
   box-shadow: var(--shadow);
 }
 
@@ -412,7 +414,7 @@ main {
 .inline-form button[type="submit"] {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .inline-form button:disabled {
@@ -437,7 +439,7 @@ main {
   background: var(--surface);
   border-top: 4px solid var(--danger);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-strong);
 }
 
 .danger-confirm p {
@@ -470,7 +472,7 @@ main {
 
 #danger-button {
   background: var(--danger);
-  color: #fff;
+  color: #ffffff;
   border: none;
 }
 

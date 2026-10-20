@@ -851,11 +851,27 @@ function mixColor(hex, target, ratio) {
   return `#${mixed.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
+// 相対輝度（0が黒、1が白に近い）。文字の読みやすさの判定に使う
+function relativeLuminance(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const channels = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
 function applyAccent(color) {
   const style = document.documentElement.style;
+  const rgb = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16)).join(", ");
   style.setProperty("--primary", color);
   style.setProperty("--primary-dark", mixColor(color, "black", 0.25));
   style.setProperty("--primary-soft", mixColor(color, "white", 0.88));
+  // 背景が明るいときは白い文字だと読みにくいので、濃い文字にする
+  style.setProperty("--on-primary", relativeLuminance(color) > 0.179 ? "#1f2a1f" : "#ffffff");
+  // 影もアクセントカラーに合わせる
+  style.setProperty("--shadow", `0 1px 3px rgba(${rgb}, 0.18), 0 4px 12px rgba(${rgb}, 0.12)`);
+  style.setProperty("--shadow-strong", `0 8px 32px rgba(${rgb}, 0.3)`);
   accentPicker.value = color;
 }
 
