@@ -870,8 +870,8 @@ function applyAccent(color) {
   // 背景が明るいときは白い文字だと読みにくいので、濃い文字にする
   style.setProperty("--on-primary", relativeLuminance(color) > 0.179 ? "#1f2a1f" : "#ffffff");
   // 影もアクセントカラーに合わせる
-  style.setProperty("--shadow", `0 1px 3px rgba(${rgb}, 0.18), 0 4px 12px rgba(${rgb}, 0.12)`);
-  style.setProperty("--shadow-strong", `0 8px 32px rgba(${rgb}, 0.3)`);
+  style.setProperty("--shadow", `0 2px 6px rgba(${rgb}, 0.35), 0 6px 18px rgba(${rgb}, 0.25)`);
+  style.setProperty("--shadow-strong", `0 12px 40px rgba(${rgb}, 0.45)`);
   accentPicker.value = color;
 }
 
