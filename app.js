@@ -692,11 +692,17 @@ async function loadAccount(uid) {
 
 userLoginButton.addEventListener("click", async () => {
   try {
+    // 管理者のメールアドレスの Google アカウントだと、管理者の UID でログインされる
+    adminSessionAllowed = true;
     await setPersistence(auth, browserLocalPersistence);
     const result = await signInWithPopup(auth, new GoogleAuthProvider());
+    if (result.user.uid !== adminUid) {
+      adminSessionAllowed = false;
+    }
     // 成功したら、その場で表示も切り替える
     updateAuthUi(result.user);
   } catch (error) {
+    adminSessionAllowed = false;
     if (error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request") {
       return;
     }
