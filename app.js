@@ -670,8 +670,9 @@ async function loadAccount(uid) {
 userLoginButton.addEventListener("click", async () => {
   try {
     await setPersistence(auth, browserLocalPersistence);
-    // ログイン後の画面の更新は onAuthStateChanged に任せる
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    const result = await signInWithPopup(auth, new GoogleAuthProvider());
+    // 成功したら、その場で表示も切り替える
+    updateAuthUi(result.user);
   } catch (error) {
     if (error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request") {
       return;
@@ -700,13 +701,8 @@ accentPicker.addEventListener("change", async () => {
   }
 });
 
-onAuthStateChanged(auth, async (user) => {
-  // 残っている管理者のログインは消す（管理者は再読み込みで切れるようにする）
-  if (user && user.uid === adminUid && !adminSessionAllowed) {
-    signOut(auth);
-    return;
-  }
-
+// ログイン状態に合わせて、ヘッダーと管理画面の表示を切り替える
+function updateAuthUi(user) {
   isAdmin = Boolean(user) && user.uid === adminUid;
   const signedIn = Boolean(user);
   userLoginButton.hidden = signedIn;
@@ -716,9 +712,21 @@ onAuthStateChanged(auth, async (user) => {
   if (isAdmin) {
     adminScreen.hidden = true;
   }
+}
 
-  if (signedIn) {
-    await loadAccount(user.uid);
+onAuthStateChanged(auth, (user) => {
+  console.log("auth state changed:", user ? user.uid : "signed out");
+
+  // 残っている管理者のログインは消す（管理者は再読み込みで切れるようにする）
+  if (user && user.uid === adminUid && !adminSessionAllowed) {
+    signOut(auth);
+    return;
+  }
+
+  // 表示は先に切り替える（色の読み込みを待たない）
+  updateAuthUi(user);
+  if (user) {
+    loadAccount(user.uid);
   } else {
     applyAccent(DEFAULT_ACCENT);
   }
