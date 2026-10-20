@@ -196,6 +196,11 @@ function buildItemName(template, value) {
   return applyTemplate(template, value);
 }
 
+// テンプレートの最初のプレースホルダー名（例：{aa}_planks → aa）
+function placeholderName(template) {
+  return template.match(/\{([^{}]+)\}/)?.[1] ?? "";
+}
+
 function hasPlaceholder(template) {
   return /\{[^{}]+\}/.test(template);
 }
@@ -312,6 +317,9 @@ function createAddForm(path, onCancel, bulk = false) {
     status.textContent = "";
     idTemplate = idTemplateValue;
     nameTemplate = nameTemplateValue;
+    // リストの見出しを、テンプレートのプレースホルダー名に合わせる
+    idHeader.textContent = idTemplate ? `英語名（${placeholderName(idTemplate)}）` : "ID";
+    nameHeader.textContent = nameTemplate ? `日本語名（${placeholderName(nameTemplate)}）` : "日本語名";
     listMode = true;
     idTemplateInput.readOnly = true;
     nameTemplateInput.readOnly = true;
