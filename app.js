@@ -98,16 +98,22 @@ function renderTree(node, container, parentPath = []) {
         return;
       }
       event.preventDefault();
-      showFolderMenu(event.clientX, event.clientY, path);
+      showContextMenu(event.clientX, event.clientY, folderActions(path));
     });
     details.append(summary);
 
     for (const item of child.items) {
-      details.append(createItemButton(item, item.name_ja));
+      details.append(
+        item.id === editingItemId ? createItemEditForm(item) : createItemButton(item, item.name_ja),
+      );
     }
     renderTree(child, details, path);
 
-    if (isAdmin) {
+    if (moveSource) {
+      if (canMoveTo(path)) {
+        details.append(createMoveEntry(path));
+      }
+    } else if (isAdmin) {
       details.append(
         createEntry("+ ここに新規作成", (onCancel) => createAddForm(path, onCancel)),
         createEntry("+ 一括新規作成", (onCancel) => createAddForm(path, onCancel, true)),
@@ -123,6 +129,13 @@ function createItemButton(item, label) {
   button.className = "item";
   button.textContent = label;
   button.addEventListener("click", () => showItem(item));
+  button.addEventListener("contextmenu", (event) => {
+    if (!isAdmin) {
+      return;
+    }
+    event.preventDefault();
+    showContextMenu(event.clientX, event.clientY, itemActions(item));
+  });
   return button;
 }
 
@@ -446,18 +459,46 @@ function hasPrefix(path, prefix) {
   return path.length >= prefix.length && prefix.every((name, i) => path[i] === name);
 }
 
-let menuPath = null;
-
-function showFolderMenu(x, y, path) {
-  menuPath = path;
+// 右クリックメニュー（押した対象に応じて項目を入れ替える）
+function showContextMenu(x, y, actions) {
+  folderMenu.replaceChildren(
+    ...actions.map(({ label, danger, run }) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      if (danger) {
+        button.className = "danger-item";
+      }
+      button.addEventListener("click", () => {
+        hideContextMenu();
+        run();
+      });
+      return button;
+    }),
+  );
   folderMenu.style.left = `${x}px`;
   folderMenu.style.top = `${y}px`;
   folderMenu.hidden = false;
 }
 
-function hideFolderMenu() {
+function hideContextMenu() {
   folderMenu.hidden = true;
-  menuPath = null;
+}
+
+function folderActions(path) {
+  return [
+    { label: "名前を変更", run: () => renameFolder(path) },
+    { label: "移動", run: () => startMove({ kind: "folder", path }) },
+    { label: "削除", danger: true, run: () => deleteFolder(path) },
+  ];
+}
+
+function itemActions(item) {
+  return [
+    { label: "編集", run: () => startEdit(item) },
+    { label: "移動", run: () => startMove({ kind: "item", item }) },
+    { label: "削除", danger: true, run: () => deleteItem(item) },
+  ];
 }
 
 async function renameFolder(path) {
@@ -475,20 +516,23 @@ async function renameFolder(path) {
     return;
   }
 
-  const newPath = [...path.slice(0, -1), newName];
+  await relocateFolder(path, [...path.slice(0, -1), newName]);
+}
+
+// フォルダーを別のパスへ移す（改名・移動の共通処理）。中のフォルダーとアイテムも一緒に動く
+async function relocateFolder(path, newPath) {
   const conflict =
     folderPaths.some((p) => hasPrefix(p, newPath)) || items.some((item) => hasPrefix(item.path, newPath));
   if (conflict) {
-    window.alert("同じ名前のフォルダーが既にあります。");
+    window.alert("移動先に同じ名前のフォルダーかアイテムが既にあります。");
     return;
   }
 
-  // 中のフォルダーとアイテムのカテゴリも、新しい名前に合わせて書き換える
   const batch = writeBatch(db);
   for (const folder of folderPaths.filter((p) => hasPrefix(p, path))) {
-    const renamed = [...newPath, ...folder.slice(path.length)];
+    const moved = [...newPath, ...folder.slice(path.length)];
     batch.delete(doc(db, "folders", folder.join(">")));
-    batch.set(doc(db, "folders", renamed.join(">")), { path: renamed });
+    batch.set(doc(db, "folders", moved.join(">")), { path: moved });
   }
   for (const item of items.filter((i) => hasPrefix(i.path, path))) {
     batch.update(doc(db, "items", item.id), { path: [...newPath, ...item.path.slice(path.length)] });
@@ -498,7 +542,7 @@ async function renameFolder(path) {
     await batch.commit();
     await loadItems();
   } catch (error) {
-    window.alert("名前の変更に失敗しました。権限かネットワークを確認してください。");
+    window.alert("移動に失敗しました。権限かネットワークを確認してください。");
     console.error(error);
   }
 }
@@ -562,6 +606,153 @@ function closeDanger() {
   resetDanger();
 }
 
+// ---- 移動 ----
+// moveSource は { kind: "folder", path } か { kind: "item", item }。移動先を選ぶ間だけ入る
+let moveSource = null;
+
+function startMove(source) {
+  moveSource = source;
+  editingItemId = null;
+  renderSearch(searchInput.value);
+}
+
+function cancelMove() {
+  moveSource = null;
+  renderSearch(searchInput.value);
+}
+
+function currentParentKey(source) {
+  return source.kind === "folder" ? source.path.slice(0, -1).join(">") : source.item.path.join(">");
+}
+
+// 移動先として選べるか（フォルダーは自分の中には動かせない。今いる場所への移動も不要）
+function canMoveTo(destPath) {
+  if (moveSource.kind === "folder" && hasPrefix(destPath, moveSource.path)) {
+    return false;
+  }
+  return currentParentKey(moveSource) !== destPath.join(">");
+}
+
+function createMoveEntry(destPath) {
+  const wrapper = document.createElement("div");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "add-entry";
+  button.textContent = destPath.length === 0 ? "→ 最上層に移動" : "→ ここに移動";
+  button.addEventListener("click", () => moveTo(destPath));
+  wrapper.append(button);
+  return wrapper;
+}
+
+function createMoveBanner() {
+  const banner = document.createElement("div");
+  banner.className = "move-banner";
+  const text = document.createElement("span");
+  const name = moveSource.kind === "folder" ? moveSource.path.join(" > ") : moveSource.item.name_ja;
+  text.textContent = `「${name}」の移動先を選んでください`;
+  banner.append(text, createSmallButton("キャンセル", "button"));
+  banner.lastChild.addEventListener("click", cancelMove);
+  return banner;
+}
+
+async function moveTo(destPath) {
+  const source = moveSource;
+  moveSource = null;
+  if (source.kind === "folder") {
+    await relocateFolder(source.path, [...destPath, source.path[source.path.length - 1]]);
+  } else {
+    await moveItem(source.item, destPath);
+  }
+}
+
+async function moveItem(item, destPath) {
+  try {
+    await writeBatch(db).update(doc(db, "items", item.id), { path: destPath }).commit();
+    await loadItems();
+  } catch (error) {
+    window.alert("移動に失敗しました。権限かネットワークを確認してください。");
+    console.error(error);
+  }
+}
+
+// ---- アイテムの編集・削除 ----
+let editingItemId = null;
+
+function startEdit(item) {
+  editingItemId = item.id;
+  renderSearch(searchInput.value);
+}
+
+function createItemEditForm(item) {
+  const form = document.createElement("form");
+  form.className = "inline-form";
+
+  const idInput = createInlineInput("ID", true);
+  idInput.value = item.id;
+  const nameInput = createInlineInput("日本語名", true);
+  nameInput.value = item.name_ja;
+
+  const status = document.createElement("p");
+  status.className = "error";
+
+  const save = createSmallButton("保存", "submit");
+  const cancel = createCancelButton(() => {
+    editingItemId = null;
+    renderSearch(searchInput.value);
+  });
+  form.append(idInput, nameInput, status, save, cancel);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    status.textContent = "";
+
+    const id = idInput.value.trim().replace(/^minecraft:/, "");
+    const name = nameInput.value.trim();
+    if (!ID_PATTERN.test(id)) {
+      status.textContent = "IDは英小文字・数字・_ のみで入力してください。";
+      return;
+    }
+    if (id !== item.id && items.some((other) => other.id === id)) {
+      status.textContent = "同じIDが既に登録されています。";
+      return;
+    }
+
+    save.disabled = true;
+    try {
+      const batch = writeBatch(db);
+      if (id === item.id) {
+        batch.update(doc(db, "items", item.id), { name_ja: name });
+      } else {
+        // IDを変えると、ドキュメントのIDも変わるので作り直す
+        batch.delete(doc(db, "items", item.id));
+        batch.set(doc(db, "items", id), { id, name_ja: name, path: item.path });
+      }
+      await batch.commit();
+      editingItemId = null;
+      await loadItems();
+    } catch (error) {
+      status.textContent = "保存に失敗しました。権限かネットワークを確認してください。";
+      console.error(error);
+      save.disabled = false;
+    }
+  });
+
+  return form;
+}
+
+async function deleteItem(item) {
+  if (!window.confirm(`「${item.name_ja}（${item.id}）」を削除しますか？`)) {
+    return;
+  }
+  try {
+    await writeBatch(db).delete(doc(db, "items", item.id)).commit();
+    await loadItems();
+  } catch (error) {
+    window.alert("削除に失敗しました。権限かネットワークを確認してください。");
+    console.error(error);
+  }
+}
+
 function showItem(item) {
   const detail = document.getElementById("detail");
   detail.replaceChildren();
@@ -591,7 +782,12 @@ function renderSearch(query) {
 
   const q = query.trim().toLowerCase();
   if (!q) {
-    if (isAdmin) {
+    if (moveSource) {
+      treeNav.append(createMoveBanner());
+      if (moveSource.kind === "folder" && canMoveTo([])) {
+        treeNav.append(createMoveEntry([]));
+      }
+    } else if (isAdmin) {
       treeNav.append(
         createEntry("+ フォルダーを新規作成", (onCancel) => createFolderForm(null, onCancel)),
         createEntry("+ ここに新規作成", (onCancel) => createAddForm(null, onCancel)),
@@ -777,34 +973,21 @@ document.addEventListener("pointerdown", (event) => {
 // メニューの外側で押したら閉じる（右クリックで別のフォルダーを開いたときも閉じる）
 document.addEventListener("pointerdown", (event) => {
   if (!folderMenu.contains(event.target)) {
-    hideFolderMenu();
+    hideContextMenu();
   }
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    hideFolderMenu();
+    hideContextMenu();
     closeDanger();
+    if (moveSource) {
+      cancelMove();
+    }
     return;
   }
   if (!dangerPanel.hidden) {
     resetDanger();
-  }
-});
-
-document.getElementById("menu-rename").addEventListener("click", () => {
-  const path = menuPath;
-  hideFolderMenu();
-  if (path) {
-    renameFolder(path);
-  }
-});
-
-document.getElementById("menu-delete").addEventListener("click", () => {
-  const path = menuPath;
-  hideFolderMenu();
-  if (path) {
-    deleteFolder(path);
   }
 });
 

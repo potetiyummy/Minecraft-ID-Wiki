@@ -556,8 +556,20 @@ main {
   background: var(--primary-soft);
 }
 
-#menu-delete {
+.context-menu .danger-item {
   color: var(--danger);
+}
+
+.move-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: var(--primary-soft);
+  border-radius: 8px;
 }
 
 /* 小さい画面向け */
