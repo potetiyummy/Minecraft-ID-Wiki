@@ -382,8 +382,6 @@ function createAddForm(path, onCancel, bulk = false) {
       rowLines.replaceChildren(header);
     }
     listMode = true;
-    idTemplateInput.readOnly = true;
-    nameTemplateInput.readOnly = true;
     confirmButton.disabled = true;
     individual.hidden = true;
     listSection.hidden = false;
@@ -392,6 +390,37 @@ function createAddForm(path, onCancel, bulk = false) {
   }
 
   addRowButton.addEventListener("click", () => addRow());
+
+  // 確定後も、{…} 以外の文字（例：_fence）は編集できる。{…} の名前や数は変えられない
+  function applyTemplateEdit() {
+    if (!listMode) {
+      return;
+    }
+    const idValue = idTemplateInput.value.trim();
+    const nameValue = nameTemplateInput.value.trim();
+    const idSame = JSON.stringify(placeholderNames(idValue)) === JSON.stringify(idColumns.map((c) => c.key));
+    const nameSame = JSON.stringify(placeholderNames(nameValue)) === JSON.stringify(nameColumns.map((c) => c.key));
+    if (!idSame || !nameSame) {
+      status.textContent = "{…} の名前や数は変えられません。変える場合は、いったん閉じて作り直してください。";
+      listSubmit.disabled = true;
+      return;
+    }
+    status.textContent = "";
+    listSubmit.disabled = false;
+    idTemplate = idValue;
+    nameTemplate = nameValue;
+  }
+
+  idTemplateInput.addEventListener("input", applyTemplateEdit);
+  nameTemplateInput.addEventListener("input", applyTemplateEdit);
+  // テンプレート欄での Enter は、登録ではなく何もしない
+  for (const input of [idTemplateInput, nameTemplateInput]) {
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+      }
+    });
+  }
 
   async function saveItems(entries, idTpl, nameTpl) {
     const itemPath = path ?? parseCategoryPath(categoryInput ? categoryInput.value : "");
