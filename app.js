@@ -35,6 +35,12 @@ const adminToggle = document.getElementById("admin-toggle");
 const logoutButton = document.getElementById("logout");
 const userLoginButton = document.getElementById("user-login");
 const accentPicker = document.getElementById("accent-picker");
+const rememberLabel = document.getElementById("remember-label");
+const rememberCheckbox = document.getElementById("remember-device");
+
+// このデバイスで管理者のログインを保存するかどうか
+const REMEMBER_KEY = "rememberAdminDevice";
+const isRememberedDevice = () => localStorage.getItem(REMEMBER_KEY) === "1";
 const adminScreen = document.getElementById("admin-screen");
 const adminClose = document.getElementById("admin-close");
 const loginForm = document.getElementById("login-form");
@@ -634,7 +640,24 @@ adminClose.addEventListener("click", () => {
 
 logoutButton.addEventListener("click", () => {
   adminSessionAllowed = false;
+  localStorage.removeItem(REMEMBER_KEY);
   signOut(auth);
+});
+
+rememberCheckbox.addEventListener("change", async () => {
+  const remember = rememberCheckbox.checked;
+  if (remember) {
+    localStorage.setItem(REMEMBER_KEY, "1");
+  } else {
+    localStorage.removeItem(REMEMBER_KEY);
+  }
+  try {
+    // 今のログインを、ブラウザに保存するか・しないかを切り替える
+    await setPersistence(auth, remember ? browserLocalPersistence : inMemoryPersistence);
+  } catch (error) {
+    window.alert("設定の保存に失敗しました。");
+    console.error(error);
+  }
 });
 
 const DEFAULT_ACCENT = "#2e7d32";
@@ -709,18 +732,24 @@ function updateAuthUi(user) {
   adminToggle.hidden = signedIn;
   logoutButton.hidden = !signedIn;
   accentPicker.hidden = !signedIn;
+  rememberLabel.hidden = !isAdmin;
   if (isAdmin) {
     adminScreen.hidden = true;
+    rememberCheckbox.checked = isRememberedDevice();
   }
 }
 
 onAuthStateChanged(auth, (user) => {
   console.log("auth state changed:", user ? user.uid : "signed out");
 
-  // 残っている管理者のログインは消す（管理者は再読み込みで切れるようにする）
+  // 管理者のログインは、このデバイスで保存する設定のときだけ残す。それ以外は消す
   if (user && user.uid === adminUid && !adminSessionAllowed) {
-    signOut(auth);
-    return;
+    if (isRememberedDevice()) {
+      adminSessionAllowed = true;
+    } else {
+      signOut(auth);
+      return;
+    }
   }
 
   // 表示は先に切り替える（色の読み込みを待たない）
@@ -738,7 +767,7 @@ loginForm.addEventListener("submit", async (event) => {
   loginError.textContent = "";
   adminSessionAllowed = true;
   try {
-    await setPersistence(auth, inMemoryPersistence);
+    await setPersistence(auth, isRememberedDevice() ? browserLocalPersistence : inMemoryPersistence);
     const credential = await signInWithEmailAndPassword(auth, loginEmail.value, loginPassword.value);
     if (credential.user.uid !== adminUid) {
       adminSessionAllowed = false;
